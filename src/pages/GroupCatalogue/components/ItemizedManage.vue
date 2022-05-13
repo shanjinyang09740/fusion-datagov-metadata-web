@@ -6,30 +6,61 @@
           size="medium"
           class="right"
           type="primary"
-          @click="deleteItemize('ids')"
+          @click="manageAttr"
+          >管理分项属性</fu-button
+        >
+        <fu-button
+          size="medium"
+          class="right"
+          type="primary"
+          @click="deleteItemize()"
           >删除</fu-button
         >
         <fu-button
           size="medium"
           class="right"
           type="primary"
-          @click="manageAttr"
-          >管理分项属性</fu-button
+          @click="saveTableData"
+          >保存</fu-button
+        >
+        <fu-button
+          v-if="this.postTableData.rows.length === 0"
+          size="medium"
+          class="right"
+          type="primary"
+          @click="addTableData"
+          >新增</fu-button
         >
       </div>
       <div>
-        <advanced-query
-          :columns="queryColumns"
-          :hideAdvancedQuery="true"
-          @search="tableSearch"
-        ></advanced-query>
+        <fu-form :inline="true" class="form">
+          <fu-form-item label="分项名称/编码">
+            <fu-input
+              size="medium"
+              v-model="queryForm.label"
+              placeholder="请输入"
+              clearable
+            ></fu-input>
+          </fu-form-item>
+          <fu-form-item>
+            <fu-button
+              size="medium"
+              type="primary"
+              clearable
+              @click="formTableSearch"
+              >查询</fu-button
+            >
+          </fu-form-item>
+        </fu-form>
       </div>
     </div>
     <component-group-table
       ref="itemizeTable"
-      :tableData="tableData"
-      :tableType="'itemize'"
-      @addItem="addItem"
+      :postTableData="postTableData"
+      :tableOperateBtnGroup="tableOperateBtnGroup"
+      :tableCompType="tableCompType"
+      :rowKey="rowKey"
+      @addRow="addRow"
     ></component-group-table>
     <fu-dialog
       title="分项属性管理"
@@ -52,24 +83,23 @@
   </div>
 </template>
 <script>
-import { Button, Dialog, Message } from "fusion-ui";
-import AdvancedQuery from "@/components/AdvancedQuery";
-import ComponentGroupTable from "./ComponentGroupTable";
+import { Button, Dialog, Message, Input, Form, FormItem } from "fusion-ui";
+import ComponentGroupTable from "@/components/ComponentGroupTable";
 import attrTable from "./attributeManageTable.vue";
 import {
-  getCreateItemizeFrom,
-  deleteItemize,
-  saveItemize,
-  getItemizeDetail,
-  getItemizeTable,
   getCodeId,
+  saveItemize,
+  getItemizeTable,
   saveAttribute,
 } from "@/service/modules/labelManage.js";
+import { postJSON } from "@/utils/post";
 export default {
   components: {
     FuButton: Button,
     FuDialog: Dialog,
-    AdvancedQuery,
+    FuInput: Input,
+    FuForm: Form,
+    FuFormItem: FormItem,
     ComponentGroupTable,
     attrTable,
   },
@@ -85,208 +115,226 @@ export default {
   },
   data() {
     return {
+      // 实结点、虚节点
+      statItemType: [],
       // 初始化分项id的集合
       ids: [],
-      // 分项id
-      ItemizeId: "",
       // 查询表单
-      queryForm: {
-        groupNameCode: "",
-        statGroupType: "",
-      },
-      queryColumns: [
+      queryForm: {},
+      /**分项表格相关数据 begin********************/
+      //表格行key
+      rowKey: "statGroupItemId",
+      //表格组件类别
+      tableCompType: "itemize",
+      //表格操作列显示按钮类型
+      tableOperateBtnGroup: [
         {
-          label: "分项名称/编码：",
-          modelData: "groupNameCode",
-          type: "input",
-          labelWidth: "150px",
-          defaultValue: "",
-          isSearchShow: true,
+          label: "添加",
+          value: "addRow",
+          icon: "iconqita_tianjia",
+          imgPath: "",
+        },
+        {
+          label: "删除",
+          value: "deleteRow",
+          icon: "iconbiaoge_shanchu",
+          imgPath: "",
+        },
+        {
+          label: "复制",
+          value: "copyRow",
+          icon: "iconqita_yingshe",
+          imgPath: "",
+        },
+        {
+          label: "查看血缘",
+          value: "viewBloodItem",
+          icon: "iconbiaoge_xieyuanguanxi",
+          imgPath: "",
         },
       ],
-
-      tableData: {
-        column: [
-          {
-            label: "分项名称",
-            prop: "zbName",
-            width: "100px",
-          },
-          {
-            label: "层级",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "顺序号",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "分项编码",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "别名",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "计量单位量纲",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "计量单位",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "类型",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "说明",
-            prop: "",
-            width: "100px",
-          },
-        ],
-        page: 1,
-        pagerows: 0,
+      //表格数据
+      postTableData: {
+        column: [],
         rows: [],
-        totalrows: 0,
       },
-      createFormItems: [],
-      isShowDialog: false,
-      title: "",
       selectionId: [],
       // 属性管理
       attrDialogVisible: false,
+      tableHead: {},
     };
   },
   created() {
     this.getTableInfo();
+    this.getSelectData();
+  },
+  watch: {
+    queryForm: {
+      handler(newVal, oldVal) {
+        if (!newVal.label) {
+          this.formTableSearch();
+        }
+      },
+      deep: true,
+    },
   },
   methods: {
-    getTableInfo() {
-      getItemizeTable(this.groupId).then((res) => {
-        let result = res.data[0].data;
-        if (result) {
-          this.$set(this.tableData, "rows", result.tableData);
-          this.ids = result.tableData.map((i) => {
-            return i.statItemId;
-          });
-          let data = result.tableHead;
-          let column = [];
-          for (const key in data) {
-            column.push({
-              label: data[key],
-              prop: key,
-            });
-          }
-          this.$set(this.tableData, "column", column);
-        }
-      });
-    },
     /**
-     * @description 添加
-     * @param {Object} row
+     * @description 分项新增时生成对应的编码和id值
      */
-    addItem(row) {
+    getCodeId() {
       getCodeId()
         .then((res) => {
-          let result = res.data[0].data;
-          if (result) {
-            this.tableData.rows.push({
-              code: result.code,
-              id: result.id,
-            });
-          }
+          return res.code;
         })
         .catch((err) => {
           console.log(err);
         });
     },
     /**
-     * @description 新建分项
+     * @description 表单查询表格
+     * @param {}
+     * @returns {}
      */
-    create() {
-      this.title = "新建分项";
-      getCreateItemizeFrom().then((res) => {
-        let data = res.data[0].data;
-        if (data) {
-          this.createFormItems = data;
-          this.isShowDialog = true;
+    formTableSearch() {
+      this.$refs.itemizeTable.tableBlurredQuery(
+        ["statGroupItemName", "statGroupItemCode"],
+        this.queryForm.label
+      );
+    },
+    /**
+     * @description 保存表格数据
+     */
+    saveTableData() {
+      let params = {
+        tableData: this.$refs["itemizeTable"].tableData.rows,
+        ids: this.ids,
+        statGroupCode: this.groupCode,
+        statGroupId: this.groupId,
+      };
+      saveItemize(params)
+        .then((res) => {
+          Message.success("保存成功");
+          console.log("分项表格保存了");
+          //若保存成功，恢复表格初始状态
+          this.$refs.itemizeTable.emptyTableEditStatus();
+        })
+        .catch((err) => {
+          console.log(err);
+          Message.error("保存失败");
+        });
+    },
+    getTableInfo() {
+      getItemizeTable(this.groupId).then((res) => {
+        let result = res.data[0].data;
+        if (result) {
+          this.$set(this.postTableData, "rows", result.tableData);
+          this.ids = result.tableData.map((i) => {
+            return i.statGroupItemId;
+          });
+          this.tableHead = result.tableHead;
+          let column = [];
+          for (const key in this.tableHead) {
+            if (key === "statItemType") {
+              column.push({
+                label: this.tableHead[key],
+                prop: key,
+                type: "select",
+                option: this.statItemType,
+              });
+            } else {
+              column.push({
+                label: this.tableHead[key],
+                prop: key,
+                type: "input",
+                isIndent: key === "StatGroupItemName" ? true : false,
+              });
+            }
+          }
+          this.$set(this.postTableData, "column", column);
         }
       });
     },
-    /**
-     * @description 保存新建分项
-     */
-    submit(form) {
-      saveItemize(form)
+    getSelectData() {
+      this.getCodeTableData("MD_ITEM_TYPE")
         .then((res) => {
-          this.$refs["itemizeDialog"].closeDialog();
-          Message.success("保存成功");
-          this.isShowDialog = false;
+          if (res.data[0].data) {
+            this.statItemType = res.data[0].data;
+          }
         })
         .catch((err) => {
-          Message.error(`保存失败，${err.errorMessage}`);
+          console.log(err);
         });
+      // this.getCodeTableData("MD_ITEM_TYPE")
+      //   .then((res) => {
+      //     if (res.data[0].data) {
+      //       this.statItemType = res.data[0].data;
+      //     }
+      //   })
+      //   .catch((err) => {
+      //     console.log(err);
+      //   });
+    },
+    // 查询代码表
+    getCodeTableData(code) {
+      return postJSON(`/api/core/v1/dictionary/queryData.do?dicId=${code}`, {
+        postData: JSON.stringify({
+          data: [],
+        }),
+      });
     },
     /**
-     * @description 编辑
+     * @description 初始化新建分项
      */
-    editItemize(row) {
-      this.title = "编辑分项";
-      this.getItemizeDetail(row.id);
+    addTableData() {
+      let newCode = this.getCodeId();
+      let data = {
+        statGroupItemCode: newCode,
+        statGroupItemSortNum: 1,
+      };
+      for (const key in this.tableHead) {
+        this.$set(data, key, "");
+      }
+      this.postTableData.rows.push(data);
     },
     /**
-     * @description 查看
+     * @description 新建分项
      */
-    lookItemize(row) {
-      this.title = "查看分项";
-      this.getItemizeDetail(row.id);
-    },
-    /**
-     * @description 获取分项信息
-     */
-    getItemizeDetail(id) {
-      getItemizeDetail(id).then((res) => {
-        let data = res.data[0].data;
-        if (data) {
-          this.createFormItems = data;
-          this.isShowDialog = true;
-        }
+    addRow(row, $index) {
+      let newCode = this.getCodeId();
+      let data = {
+        statGroupItemCode: newCode,
+        isClick: true,
+      };
+      for (const key in this.tableHead) {
+        this.$set(data, key, "");
+      }
+      this.$refs["itemizeTable"].rows.splice($index, 0, data);
+      this.$refs["itemizeTable"].rows.forEach((item, index) => {
+        item.statGroupItemSortNum = index + 1;
       });
     },
     /**
      * @description 删除
      */
-    deleteItemize(type, row) {
-      let params = "";
-      if (type === "ids") {
-        params = this.selectionId.join(",");
-      } else {
-        params = row.id;
+    deleteItemize() {
+      this.selectionId = this.$refs["itemizeTable"].selectedTableData.map(
+        (item) => {
+          return item[this.rowKey];
+        }
+      );
+      if (this.selectionId.length === 0) {
+        Message.warning("请选择要删除的分项");
+        return;
       }
-      this.$confirm("此操作将永久删除该文件, 是否继续?", "提示", {
+      this.$confirm("确定删除分项?", "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         type: "warning",
       })
         .then(() => {
-          deleteItemize(params)
-            .then((res) => {
-              if (res.data[0].data) {
-                Message.success("删除成功!");
-              }
-            })
-            .catch((err) => {
-              Message.error(`删除失败!，${err.errorMessage}`);
-            });
+          this.$refs["itemizeTable"].batchDeleteRow();
+          Message.success("删除成功!");
         })
         .catch(() => {
           this.$message({
@@ -295,28 +343,17 @@ export default {
           });
         });
     },
-    handleSelectionChange(selection) {
-      this.selectionId = selection.map((item) => {
-        return item.id;
-      });
-    },
-    /**
-     * @description 表单查询
-     */
-    tableSearch(form) {
-      this.queryForm = JSON.parse(JSON.stringify(form));
-    },
     /**
      * @description 管理分项属性
      */
     manageAttr() {
       this.attrDialogVisible = true;
     },
-    addAttr() {
-      this.$refs.attrDialog.add();
-    },
     submitAttr() {
       console.log(this.groupId, "属性列表");
+      this.$refs.attrDialog.tableData.rows.forEach((item, index) => {
+        this.$set(item, "sortNum", index);
+      });
       let params = {
         statGroupId: this.groupId,
         statGroupCode: this.groupCode,
@@ -326,17 +363,16 @@ export default {
         .then((res) => {
           let result = res.data[0].data;
           if (result) {
-            this.$set(this.tableData, "rows", result.tableData);
-            let data = result.tableHead;
+            this.$set(this.postTableData, "rows", result.tableData);
+            this.tableHead = result.tableHead;
             let column = [];
-            for (const key in data) {
+            for (const key in this.tableHead) {
               column.push({
-                label: data[key],
+                label: this.tableHead[key],
                 prop: key,
               });
             }
-            this.$set(this.tableData, "column", column);
-            console.log(this.tableData);
+            this.$set(this.postTableData, "column", column);
             Message.success("保存成功!");
             this.attrDialogVisible = false;
           }

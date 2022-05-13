@@ -247,7 +247,7 @@ export default {
             {
               id: "6-1",
               text: "指标查询",
-              src: "",
+              src: "/IndicatorQuery.html",
             },
             {
               id: "6-2",

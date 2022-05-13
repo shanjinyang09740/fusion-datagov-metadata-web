@@ -78,6 +78,12 @@ var productPages = {
     filename: "PublicDimension.html",
     title: "公共维度",
   },
+  IndicatorQuery: {
+    entry: "src/pages/IndicatorQuery/index.js",
+    template: "public/index.html",
+    filename: "IndicatorQuery.html",
+    title: "元数据查询",
+  },
 };
 
 //打包

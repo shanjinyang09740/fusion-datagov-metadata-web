@@ -4,17 +4,12 @@
     :fu-data="tableData"
     :row-key="rowKey"
     :row-class-name="tableRowClassName"
+    max-height="700px"
     border
     @row-click="rowClick"
     @selection-change="handleSelectionChange"
-    v-clickoutside="triggerHideRowInputEvent"
   >
-    <fu-table-column
-      :isShowCheckBox="isShowCheckBox"
-      type="selection"
-      width="55"
-    >
-    </fu-table-column>
+    <fu-table-column type="selection" width="55"> </fu-table-column>
     <fu-table-column label="序号" type="index" width="50"> </fu-table-column>
     <fu-table-column
       v-for="(item, index) in tableData.column"
@@ -24,65 +19,18 @@
       :minWidth="item.width"
     >
       <template slot-scope="scope">
-        <div v-if="isEdit">
-          <div v-if="scope.row.isClick">
-            <fu-input
-              v-if="item.type == 'select'"
-              v-model="scope.row[item.prop]"
-              size="mini"
-              @change="valueChange(scope.row, item.prop)"
-            ></fu-input>
-            <fu-select
-              v-else-if="item.type == 'select'"
-              v-model="scope.row[item.prop]"
-              placeholder="请选择"
-              size="medium"
-            >
-              <fu-option
-                v-for="i in item.option"
-                :key="i.value"
-                :label="i.text"
-                :value="i.value"
-              >
-              </fu-option>
-            </fu-select>
-          </div>
-          <div v-else>
-            <div v-if="item.isIndent">
-              <div
-                :style="{
-                  paddingLeft:
-                    (Number(scope.row.statGroupItemLevel) - 1) * 20 + 'px',
-                }"
-              >
-                {{ scope.row[item.prop] }}
-              </div>
-            </div>
-            <div v-else>
-              {{ scope.row[item.prop] }}
-            </div>
-          </div>
+        <div
+          v-if="item.isIndent"
+          :style="{
+            paddingLeft: (Number(scope.row.statIndctLevel) - 1) * 20 + 'px',
+          }"
+        >
+          {{ scope.row[item.prop] }}
         </div>
-        <div v-else>
-          <div
-            v-if="item.isIndent"
-            :style="{
-              paddingLeft:
-                (Number(scope.row.statGroupItemLevel) - 1) * 20 + 'px',
-            }"
-          >
-            {{ scope.row[item.prop] }}
-          </div>
-          <div v-else>{{ scope.row[item.prop] }}</div>
-        </div>
+        <div v-else>{{ scope.row[item.prop] }}</div>
       </template>
     </fu-table-column>
-    <fu-table-column
-      v-if="isShowOperate"
-      fixed="right"
-      label="操作"
-      width="200"
-    >
+    <fu-table-column fixed="right" label="操作" width="200">
       <template slot-scope="scope">
         <div class="operateBtns">
           <span
@@ -127,29 +75,10 @@ import {
   Dropdown,
   DropdownMenu,
   DropdownItem,
+  Message,
 } from "fusion-ui";
 import http from "@/utils/http";
 import { arraySortByProp } from "@/utils/tool";
-import Vue from "vue";
-//自定义事件---点击除目标容器外空白区域触发
-Vue.directive("clickoutside", {
-  bind(el, binding) {
-    function documentHandler(e) {
-      if (el.contains(e.target)) {
-        return false;
-      }
-      if (binding.expression) {
-        binding.value(e);
-      }
-    }
-    el.__vueClickOutside__ = documentHandler;
-    document.addEventListener("click", documentHandler);
-  },
-  unbind(el) {
-    document.removeEventListener("click", el.__vueClickOutside__);
-    delete el.__vueClickOutside__;
-  },
-});
 export default {
   name: "mainTable",
   components: {
@@ -161,20 +90,10 @@ export default {
     FuDropdownMenu: DropdownMenu,
   },
   props: {
-    //是否显示操作列
-    isShowOperate: {
-      type: Boolean,
-      default: true,
-    },
-    //是否显示复选框
-    isShowCheckBox: {
-      type: Boolean,
-      default: true,
-    },
     //表格行单元格是否可编辑
     isEdit: {
       type: Boolean,
-      default: true,
+      default: false,
     },
     //表格行操作按钮组
     tableOperateBtnGroup: {
@@ -207,10 +126,7 @@ export default {
     tableData() {
       //处理拿到的数据---按照sortNum行排序
       let newTableData = JSON.parse(JSON.stringify(this.postTableData));
-      newTableData["rows"] = arraySortByProp(
-        "statGroupItemSortNum",
-        newTableData.rows
-      );
+      newTableData["rows"] = arraySortByProp("sortNum", newTableData.rows);
       return newTableData;
     },
   },
@@ -225,29 +141,12 @@ export default {
   destroyed() {},
   methods: {
     /**
-     * @description 清空表格编辑选中状态
-     */
-    emptyTableEditStatus() {
-      let tableRows = this.tableData.rows;
-      tableRows = tableRows.map((item) => {
-        return {
-          ...item,
-          isEdit: false,
-          isClick: false,
-        };
-      });
-      this.$set(this.tableData, "rows", tableRows);
-    },
-    /**
      * @description 自定义行样式
      */
     tableRowClassName({ row, rowIndex }) {
       if (row) {
-        row.index = rowIndex;
         if (row.highLight) {
           return "highLight-row";
-        } else if (this.isEdit && row.isEdit) {
-          return "edit-row";
         }
       } else {
         return "";
@@ -282,16 +181,12 @@ export default {
       }
     },
     /**
-     * @description 点击表格外空白区域触发事件---隐藏表格行内表单
+     * @description 查看血缘关系
+     * @param {}
+     * @returns {}
      */
-    triggerHideRowInputEvent() {
-      let newTableData = this.tableData.rows.map((item) => {
-        return {
-          ...item,
-          isClick: false,
-        };
-      });
-      this.$set(this.tableData, "rows", newTableData);
+    viewBloodItem(row) {
+      //TODO
     },
     /**
      * @description 表格行点击事件
@@ -301,10 +196,9 @@ export default {
     rowClick(row, column, event) {
       //阻止事件冒泡
       event.stopPropagation();
-      let newTableData = this.tableData.rows.map((item, index) => {
+      let newTableData = this.tableData.rows.map((item) => {
         let $item = { ...item };
         $item.isClick = item[this.rowKey] == row[this.rowKey] ? true : false;
-        if (index == row.index) $item.isEdit = true;
         return $item;
       });
       this.$set(this.tableData, "rows", newTableData);
@@ -336,6 +230,7 @@ export default {
      */
     handleSelectionChange(val) {
       this.selectedTableData = val;
+      this.$emit("changeMoveBtnStatus", val.length ? false : true);
     },
 
     /**
@@ -352,23 +247,133 @@ export default {
      * @description 编辑
      * @param {Object} row
      */
-    editRow(row) {},
+    editRow(row) {
+      this.$emit("editIndicator", row);
+    },
     /**
      * @description 复制
      * @param {Object} row
      */
-    copyRow(row) {},
+    copyRow(row, $index) {
+      //获取新编码
+      http
+        .post("/api/meta/v1/indct/randomCode.do", {
+          postData: `{"data":[{"name":"info","vtype":"attr","data":""}]}`,
+        })
+        .then((res) => {
+          let result = res.data[0].data[0];
+          let postData = {
+            data: [
+              {
+                name: "statIndctId",
+                vtype: "attr",
+                data: row.statIndctId,
+              },
+              { name: "type", vtype: "attr", data: "1" },
+              {
+                name: "statIndctCode",
+                vtype: "attr",
+                data: result.code,
+              },
+            ],
+          };
+          http
+            .post("/api/meta/v1/indct/indctCopyOrNewVersion.do", {
+              postData: JSON.stringify(postData),
+            })
+            .then((res) => {
+              if (res.message == "success") {
+                Message.success("复制成功");
+                this.$emit("upDateTableData");
+              }
+            })
+            .catch((err) => {
+              Message.error(`复制失败!，${err.errorMessage}`);
+            });
+        });
+    },
     /**
      * @description 创建新版本
      * @param {Object} row
      */
-    createVersion(row) {},
+    createVersion(row, $index) {
+      http
+        .post("/api/meta/v1/indct/randomCode.do", {
+          postData: `{"data":[{"name":"info","vtype":"attr","data":""}]}`,
+        })
+        .then((res) => {
+          let result = res.data[0].data[0];
+          let postData = {
+            data: [
+              {
+                name: "statIndctId",
+                vtype: "attr",
+                data: row.statIndctId,
+              },
+              { name: "type", vtype: "attr", data: "2" },
+              {
+                name: "statIndctCode",
+                vtype: "attr",
+                data: result.code,
+              },
+            ],
+          };
+          http
+            .post("/api/meta/v1/indct/indctCopyOrNewVersion.do", {
+              postData: JSON.stringify(postData),
+            })
+            .then((res) => {
+              if (res.message == "success") {
+                Message.success("创建成功");
+                this.$emit("upDateTableData");
+              }
+            })
+            .catch((err) => {
+              Message.error(`创建失败!，${err.errorMessage}`);
+            });
+        });
+    },
     /**
      * @description 添加
      * @param {Object} row
      */
     addRow(row, $index) {
-      this.$emit("addRow", row, $index);
+      //TODO begin 测试待删除
+      let result = {
+        code: 123,
+        statIndctId: "1122233",
+      };
+      let newRow = {};
+      for (let key in row) {
+        newRow[key] = "";
+      }
+      newRow.statIndctCode = result.code;
+      newRow.isClick = true;
+      newRow[this.rowKey] = result[this.rowKey];
+      this.tableData.rows.splice($index, 0, newRow);
+      this.tableData.rows.forEach((item, index) => {
+        item.sortNum = index + 1;
+      });
+      //TODO end 测试待删除
+      //获取新编码
+      // http
+      //   .post("/api/meta/v1/indct/randomCode.do", {
+      //     postData: `{"data":[{"name":"info","vtype":"attr","data":""}]}`,
+      //   })
+      //   .then((res) => {
+      //     let result = res.data[0].data[0];
+      //     let newRow = {};
+      //     for (let key in row) {
+      //       newRow[key] = "";
+      //     }
+      //     newRow.statIndctCode = result.code;
+      //     newRow.isClick = true;
+      //     newRow[this.rowKey] = result.id;
+      //     this.tableData.rows.splice($index - 1, 0, newRow);
+      //     this.tableData.rows.forEach((item, index) => {
+      //       item.sortNum = index + 1;
+      //     });
+      //   });
     },
     /**
      * @description 查看血缘
@@ -380,23 +385,71 @@ export default {
      * @param {Object} row
      */
     deleteRow(row, $index) {
-      let newArr = this.tableData.rows.filter((item, index) => index != $index);
-      this.$set(this.tableData, "rows", newArr);
+      let tableRows = this.tableData.rows,
+        ids = "";
+      ids = row.statIndctId;
+      this.delRowsPostFunc(ids, () => {
+        let newArr = tableRows.filter((item, index) => index != $index);
+        this.$set(this.tableData, "rows", newArr);
+      });
     },
     /**
      * @description 批量删除
      */
     batchDeleteRow() {
-      let tableRows = this.tableData.rows;
-      this.selectedTableData.forEach((item) => {
-        this.tableData.rows.some((ite, index) => {
-          if (item.id == ite.id) {
-            tableRows.splice(index, 1);
-            return true;
-          }
-        });
+      let tableRows = this.tableData.rows,
+        selectTableRows = this.selectedTableData,
+        idsArr = [],
+        ids = "";
+      selectTableRows.forEach((item) => {
+        idsArr.push(item.statIndctId);
       });
-      this.$set(this.tableData, "rows", tableRows);
+      ids = idsArr.join(",");
+      this.delRowsPostFunc(ids, () => {
+        selectTableRows.forEach((item) => {
+          tableRows.some((ite, index) => {
+            if (item.id == ite.id) {
+              tableRows.splice(index, 1);
+              return true;
+            }
+          });
+        });
+        this.$set(this.tableData, "rows", tableRows);
+      });
+    },
+    /**
+     * @description 删除指标请求接口
+     * @param {String} ids
+     * @returns {Function} callback
+     */
+    delRowsPostFunc(ids, callback) {
+      this.$confirm("此操作将永久删除该文件, 是否继续?", "提示", {
+        confirmButtonText: "确定",
+        cancelButtonText: "取消",
+        type: "warning",
+      })
+        .then(() => {
+          let postData = { data: [{ name: "ids", vtype: "attr", data: ids }] };
+          http
+            .post("/api/meta/v1/indct/removeIndcts.do", {
+              postData: JSON.stringify(postData),
+            })
+            .then((res) => {
+              if (res.message == "success") {
+                Message.success("删除成功");
+                callback();
+              }
+            })
+            .catch((err) => {
+              Message.error(`删除失败!，${err.errorMessage}`);
+            });
+        })
+        .catch(() => {
+          this.$message({
+            type: "info",
+            message: "已取消删除",
+          });
+        });
     },
   },
 };

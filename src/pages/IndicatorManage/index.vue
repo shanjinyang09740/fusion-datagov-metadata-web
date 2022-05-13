@@ -1,54 +1,36 @@
 <template>
   <div class="content">
-    <div class="operateLan">
-      <div class="fenqu" v-if="selectProjectOption.length > 1">
-        <span class="label">分区</span>
-        <fu-select
-          v-model="selectProjectValue"
-          @change="changeSelectProject"
-          clearable
-          placeholder="请选择"
-        >
-          <fu-option
-            v-for="item in selectProjectOption"
-            :key="item.value"
-            :label="item.text"
-            :value="item.value"
-          >
-          </fu-option>
-        </fu-select>
-      </div>
-      <div class="groupBtns">
-        <fu-button type="primary" size="medium" @click="importVariable"
-          >导入指标</fu-button
-        >
-        <fu-button type="primary" size="medium" @click="exportVariable"
-          >导出指标</fu-button
-        >
-        <fu-button type="primary" size="medium" @click="exportModel"
-          >模板下载</fu-button
-        >
-      </div>
-    </div>
     <div class="main">
       <div class="leftArea">
         <variable-tree
           ref="variableTree"
           @treeNodeClick="treeNodeClick"
-          :selectedProjectItem="selectedProjectItem"
-          :selectProjectValue="selectProjectValue"
         ></variable-tree>
       </div>
       <div class="rightArea">
         <div class="operateLan">
           <div class="groupBtns">
-            <fu-button type="primary" size="mini" @click="createVariable"
+            <fu-button type="primary" size="medium" @click="importVariable"
+              >导入指标</fu-button
+            >
+            <fu-button type="primary" size="medium" @click="exportVariable"
+              >导出指标</fu-button
+            >
+            <fu-button type="primary" size="medium" @click="createVariable"
               >新建指标</fu-button
-            > 
-            <fu-button type="primary" size="mini" @click="moveVariable"
+            >
+            <fu-button
+              type="primary"
+              :disabled="isMoveDisable"
+              size="medium"
+              @click="moveVariable"
               >移动</fu-button
             >
-            <fu-button type="primary" size="mini" @click="batchDeleteRows"
+            <fu-button
+              :disabled="isMoveDisable"
+              type="primary"
+              size="medium"
+              @click="batchDeleteRows"
               >删除</fu-button
             >
           </div>
@@ -56,47 +38,17 @@
             <fu-form-item label="指标名称/编码">
               <fu-input
                 size="medium"
-                v-model="formData.statIndctLabel"
+                v-model="formData.label"
                 placeholder="请输入"
                 clearable
               ></fu-input>
             </fu-form-item>
-            <fu-form-item label="指标类型">
-              <fu-select
-                v-model="formData.selectVariableTypeValue"
-                clearable
-                placeholder="请选择"
-              >
-                <fu-option
-                  v-for="item in selectVariableTypeOption"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                >
-                </fu-option>
-              </fu-select>
-            </fu-form-item>
-            <fu-form-item label="指标状态">
-              <fu-select
-                v-model="formData.selectVariableStatusValue"
-                clearable
-                placeholder="请选择"
-              >
-                <fu-option
-                  v-for="item in selectVariableStatusOption"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                >
-                </fu-option>
-              </fu-select>
-            </fu-form-item>
             <fu-form-item>
               <fu-button
-                size="mini"
+                size="medium"
                 type="primary"
                 clearable
-                @click="onSubmitQuery"
+                @click="tableSearch"
                 >查询</fu-button
               >
             </fu-form-item>
@@ -108,7 +60,9 @@
           :tableOperateBtnGroup="tableOperateBtnGroup"
           :tableCompType="tableCompType"
           :rowKey="rowKey"
-          :isEdit="true"
+          :isEdit="false"
+          @changeMoveBtnStatus="changeMoveBtnStatus"
+          @editIndicator="editIndicator"
           ref="MainTable"
         ></main-table>
       </div>
@@ -117,13 +71,15 @@
       v-if="isShowDialog"
       :isShowDialog="isShowDialog"
       :title="dialogTitle"
-      :width="'50%'"
+      :width="'80%'"
       @on-result-change="changeIsShowDialog"
       @child-operation="operation"
     >
       <div slot="body">
         <component
           :selectTreeNode="selectTreeNode"
+          :postIndicatorForm="postIndicatorForm"
+          :isEdit="isEdit"
           ref="dialogForm"
           :is="dialogComp"
         ></component>
@@ -145,9 +101,10 @@ import {
   Message,
 } from "fusion-ui";
 import variableTree from "./components/variableTree";
-import MainTable from "@/components/ComponentGroupTable";
+import MainTable from "./components/IndicatorTable";
 import CustomDialog from "@/components/CommonDialog";
 import AddVariable from "./components/AddVariable";
+import MoveVariable from "./components/MoveVariable";
 import http from "@/utils/http";
 export default {
   name: "variableManage",
@@ -175,125 +132,101 @@ export default {
           sort: "sort",
         },
       ],
-      //分区数据下拉菜单
-      selectProjectOption: [],
-      selectedProjectItem: {},
-      selectProjectValue: "",
-      //指标类型下拉菜单
-      selectVariableTypeOption: [
-        {
-          label: "衍生",
-          value: "0",
-        },
-        {
-          label: "非衍生",
-          value: "1",
-        },
-      ],
-      //指标状态下拉菜单
-      selectVariableStatusOption: [
-        {
-          label: "启用",
-          value: "0",
-        },
-        {
-          label: "停用",
-          value: "1",
-        },
-      ],
+      //是否禁用移动按钮
+      isMoveDisable: true,
       //当前选中的指标树节点
       selectTreeNode: {},
-      //当前选中的表格数据
-      selectTableData: [],
       //表格行key
       rowKey: "statIndctId",
       //表格组件类别
       tableCompType: "indicator",
+      //指标属性参数
+      postIndicatorForm: {},
+      //指标弹窗是否编辑
+      isEdit: false,
       //表格操作列显示按钮类型
       tableOperateBtnGroup: [
         {
           label: "编辑",
           value: "editRow",
           icon: "iconbiaoge_bianji",
-          imgPath: ""
+          imgPath: "",
         },
         {
           label: "删除",
           value: "deleteRow",
           icon: "iconbiaoge_shanchu",
-          imgPath: ""
-        },
-        {
-          label: "添加",
-          value: "addRow",
-          icon: "iconqita_tianjia",
-          imgPath: ""
+          imgPath: "",
         },
         {
           label: "复制",
           value: "copyRow",
           icon: "iconqita_yingshe",
-          imgPath: ""
+          imgPath: "",
         },
         {
           label: "创建新版本",
           value: "createVersion",
           icon: "iconqita_zidingyi",
-          imgPath: ""
+          imgPath: "",
         },
         {
           label: "查看血缘",
           value: "viewBloodItem",
           icon: "iconbiaoge_xieyuanguanxi",
-          imgPath: ""
+          imgPath: "",
         },
       ],
       //表格数据
       postTableData: {
         column: [
           {
-            label: "指标名称",
+            label: "名称",
             prop: "statIndctNameCh",
             width: "150",
-            isInput: true,
             //是否缩进
-            isIndent: true
+            isIndent: true,
           },
           {
-            label: "层级",
-            prop: "level",
-            width: "50",
-            isInput: true,
-          },
-          {
-            label: "顺序号",
-            prop: "sortNum",
-            width: "50",
-          },
-          {
-            label: "指标编码",
+            label: "编码",
             prop: "statIndctCode",
-            width: "80",
-            isInput: true,
+            width: "100",
           },
-
           {
-            label: "指标别名",
+            label: "别名",
             prop: "statIndctNicknameCh",
             width: "150",
             reqUrl: "",
-            isInput: true,
+          },
+          {
+            label: "层级",
+            prop: "statIndctLevel",
+            width: "50",
+          },
+          {
+            label: "顺序号",
+            prop: "statIndctSortNum",
+            width: "80",
+          },
+          {
+            label: "版本",
+            prop: "statIndctVersion",
+            width: "80",
+          },
+          {
+            label: "汇总类型",
+            prop: "statIndctAggregateType",
+            width: "80",
           },
           {
             label: "量纲",
-            prop: "statIndctUmDimensionLabel",
+            prop: "statIndctUmDimension",
             width: "100",
             reqUrl: "",
-            isInput: true,
           },
           {
             label: "计量单位",
-            prop: "statIndctUmLabel",
+            prop: "statIndctUm",
             width: "100",
             isInput: true,
           },
@@ -302,357 +235,21 @@ export default {
             prop: "statIndctType2",
             width: "100",
             reqUrl: "",
-            isInput: true,
           },
           {
-            label: "版本",
-            prop: "statIndctVersion",
+            label: "数据类型",
+            prop: "statIndctDataType",
             width: "100",
-            isInput: true,
+            reqUrl: "",
+          },
+          {
+            label: "指标状态",
+            prop: "statIndctStatus",
+            width: "100",
+            reqUrl: "",
           },
         ],
-        rows: [
-          {
-            aggregateType: "",
-            level: 1,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 1,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTEGFA87",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522736981985333248",
-            statIndctNameCh: "指标名称测试",
-            statIndctNicknameCh: "",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 2,
-            statIndctAlgorithm: "",
-            statIndctCode: "1",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1",
-            statIndctNameCh: "指标名称测试",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 3,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 3,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTX0ZPEX",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522551541252624384",
-            statIndctNameCh: "指标名称测试",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 4,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTJG5W3C",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522736995784593408",
-            statIndctNameCh: "1222",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 1,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 5,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTOZM78W",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737731754921984",
-            statIndctNameCh: "2",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 1,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 6,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTLIHBBN",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737003296591872",
-            statIndctNameCh: "3",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 7,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTCN1UJ7",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737593749737472",
-            statIndctNameCh: "1222",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 8,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTR7WJAH",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737607683215360",
-            statIndctNameCh: "1222",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 9,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTO3MYBH",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737612884152320",
-            statIndctNameCh: "1222",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-          {
-            aggregateType: "",
-            level: 2,
-            partitionCode: "1",
-            partitionName: "1",
-            sortNum: 10,
-            statIndctAlgorithm: "",
-            statIndctCode: "DCTSLXO4M",
-            statIndctCreatDate: "",
-            statIndctDataLength: 1,
-            statIndctDataPrecison: 1,
-            statIndctDataRangeMax: "",
-            statIndctDataRangeMin: "",
-            statIndctDataStyle: "",
-            statIndctDataType: "",
-            statIndctDesc: "update",
-            statIndctFolderId: "1",
-            statIndctId: "1522737958507384832",
-            statIndctNameCh: "1222",
-            statIndctNicknameCh: "1",
-            statIndctPurpose: "",
-            statIndctSource: "",
-            statIndctStartDate: "",
-            statIndctStatus: "",
-            statIndctStopDate: "",
-            statIndctType2: "",
-            statIndctUmDimensionId: "1",
-            statIndctUmDimensionLabel: "",
-            statIndctUmId: "1",
-            statIndctUmLabel: "",
-            statIndctUpdateDate: "",
-            statIndctVersion: "1",
-            statIndctVersionDesc: "xxx",
-          },
-        ],
+        rows: [],
       },
     };
   },
@@ -670,9 +267,20 @@ export default {
     MainTable,
     CustomDialog,
     AddVariable,
+    MoveVariable,
   },
   computed: {},
-  watch: {},
+  watch: {
+    //查询表单
+    formData: {
+      handler(newVal, oldVal) {
+        if (!newVal.label) {
+          this.tableSearch();
+        }
+      },
+      deep: true,
+    },
+  },
   beforeCreate() {},
   created() {
     //初始化数据
@@ -686,15 +294,36 @@ export default {
   destroyed() {},
   methods: {
     /**
+     * @description 编辑指标属性事件
+     * @param {Object} row
+     */
+    editIndicator(row) {
+      this.isEdit = true;
+      this.postIndicatorForm = row;
+      this.dialogComp = "AddVariable";
+      this.isShowDialog = true;
+      this.dialogTitle = "编辑指标";
+    },
+    /**
+     * @description 修改移动按钮禁用状态
+     * @param {Boolean} bool
+     */
+    changeMoveBtnStatus(bool) {
+      this.isMoveDisable = bool;
+    },
+    /**
      * @description 移动指标
-    */
+     */
     moveVariable() {
-
+      this.dialogComp = "MoveVariable";
+      this.isShowDialog = true;
+      this.dialogTitle = "分组移动";
     },
     /**
      * @description 新建指标
-    */
+     */
     createVariable() {
+      this.isEdit = false;
       this.dialogComp = "AddVariable";
       this.isShowDialog = true;
       this.dialogTitle = "新建指标";
@@ -702,27 +331,7 @@ export default {
     /**
      * @description 初始化数据
      */
-    initData() {
-      //获取分区数据
-      http.get("/api/meta/v1/partition/queryDropDownBox.do").then((res) => {
-        let result = res.data[0].data;
-        this.selectProjectOption = result;
-        this.selectedProjectItem = result[0];
-        this.selectProjectValue = result[0].value;
-      });
-    },
-    /**
-     * @description 分区下拉change事件
-     * @param {String} val
-     */
-    changeSelectProject(val) {
-      this.selectProjectOption.some((item) => {
-        if (item.value == val) {
-          this.selectedProjectItem = item;
-          return true;
-        }
-      });
-    },
+    initData() {},
     /**
      * @description 表格修改保存事件
      */
@@ -792,20 +401,6 @@ export default {
       console.log("成功提交数据了", data);
       this.isShowDynamicFormDialog = false;
     },
-    // /**
-    //  * @description 下拉切换事件
-    //  * @param {String} command
-    //  */
-    // handleCommand(command) {
-    //   this.dialogComp = command;
-    //   this.isShowDialog = true;
-    //   this.dropMenuOption.some((item) => {
-    //     if (command == item.value) {
-    //       this.dialogTitle = item.label;
-    //       return true;
-    //     }
-    //   });
-    // },
     /**
      * @description 导入变量
      */
@@ -826,43 +421,42 @@ export default {
       console.log("节点点击事件回来了", node);
       this.selectTreeNode = node;
       //刷新表格数据
-      this.afrashTableData();
+      if (node.statIndctFolderType && node.statIndctFolderType == "1")
+        this.afrashTableData();
     },
     //刷新表格数据
     afrashTableData() {
-      // let postData = {
-      //   data: [
-      //     {
-      //       name: "indct",
-      //       vtype: "json",
-      //       data: {
-      //         partitionCode: this.selectedProjectItem.value,
-      //         statIndctFolderId: this.selectTreeNode.statIndctFolderId,
-      //         statIndctType2: this.formData.selectVariableTypeValue,
-      //         statIndctStatus: this.formData.selectVariableStatusValue,
-      //         statIndctLabel: this.formData.statIndctLabel,
-      //       },
-      //     },
-      //   ],
-      // };
-      //TODO begin---测试数据待删除
       let postData = {
         data: [
           {
             name: "indct",
             vtype: "json",
             data: {
-              partitionCode: "1",
-              statIndctFolderId: "1",
-              statIndctType2: "",
-              statIndctStatus: "",
-              statIndctLabel: "1",
+              statIndctTypeId: this.selectTreeNode.statIndctFolderId,
             },
           },
+          { name: "searchType", vtype: "attr", data: "1" },
         ],
       };
+      //TODO begin---测试数据待删除
+      // let postData = {
+      //   data: [
+      //     {
+      //       name: "indct",
+      //       vtype: "json",
+      //       data: {
+      //         statIndctId: "1",
+      //         statIndctTypeId: "11",
+      //         statIndctType2: "",
+      //         statIndctStatus: "",
+      //         statIndctLabel: "1",
+      //         statIndctVersion: "1",
+      //       },
+      //     },
+      //     { name: "searchType", vtype: "attr", data: "1" },
+      //   ],
+      // };
       //TODO end---测试数据待删除
-
       http
         .post("/api/meta/v1/indct/queryIndctlist.do", {
           postData: JSON.stringify(postData),
@@ -887,40 +481,70 @@ export default {
      */
     operation(val) {
       if (val == "confirm") {
-        //确认处理逻辑
-        this.$refs.dialogForm.submit((data) => {
+        //确认处理逻辑---data 表单数据   type 弹窗组件类型
+        this.$refs.dialogForm.submit((data, type) => {
           console.log("获取到弹窗表单数据了", data);
-          let postData = {
-            data: [
-              {
-                data: {
-                  ...data,
-                  partitionCode: this.selectedProjectItem.value,
-                  partitionName: this.selectedProjectItem.text,
-                },
-                name: "indctFolder",
-                vtype: "formpanel",
-              },
-            ],
-          };
-          http
-            .post("/api/meta/v1/indctFolder/saveIndctFolder.do", {
-              postData: JSON.stringify(postData),
-            })
-            .then((res) => {
-              Message.success("新建成功");
-              //刷新树数据
-              this.$refs.variableTree.initData();
-            })
-            .catch(() => {
-              Message.error("新建失败");
-            });
-          this.isShowDialog = false;
+          if (type == "AddVariable") {
+            this.createVariableDialogCallback(data);
+          } else if (type == "MoveVariable") {
+            this.moveVariableDialogCallback(data);
+          }
         });
       } else {
         //取消处理逻辑
         this.isShowDialog = false;
       }
+    },
+    //移动指标弹窗回调函数
+    moveVariableDialogCallback(data) {
+      let selectIndicatorNodesArr = this.$refs.MainTable.selectedTableData;
+      let ids = selectIndicatorNodesArr.map((item) => item.statIndctId);
+      let postData = {
+        data: [
+          { name: "folderId", vtype: "attr", data: data.folderId },
+          { name: "ids", vtype: "attr", data: ids.join(",") },
+        ],
+      };
+      http
+        .post("/api/meta/v1/indct/moveIndct.do", {
+          postData: JSON.stringify(postData),
+        })
+        .then((res) => {
+          Message.success("移动成功");
+          this.isShowDialog = false;
+          //刷新树数据
+          this.$refs.variableTree.initTreeData();
+        })
+        .catch(() => {
+          Message.error("移动失败");
+        });
+    },
+    //新建指标弹窗回调函数
+    createVariableDialogCallback(data) {
+      let postData = {
+        data: [
+          {
+            data: {
+              ...data,
+            },
+            name: "formpanel",
+            vtype: "formpanel",
+          },
+        ],
+      };
+      http
+        .post("/api/meta/v1/indct/saveIndct.do", {
+          postData: JSON.stringify(postData),
+        })
+        .then((res) => {
+          this.isShowDialog = false;
+          Message.success("新建成功");
+          //刷新树数据
+          this.$refs.variableTree.initTreeData();
+        })
+        .catch(() => {
+          Message.error("新建失败");
+        });
     },
     /**
      * @description 新增
@@ -937,15 +561,17 @@ export default {
     /**
      * @description 表单查询事件
      */
-    onSubmitQuery() {
-      this.afrashTableData();
+    tableSearch() {
+      let codeArr = ["statIndctNameCh", "statIndctCode"];
+      this.$refs.MainTable.tableBlurredQuery(codeArr, this.formData.label);
     },
     /**
      * @description 修改表格数据操作
      * @param {Array} data
      */
-    upDateTableData(data) {
-      this.postTableData.rows = data;
+    upDateTableData() {
+      this.afrashTableData();
+      // this.postTableData.rows = data;
     },
     /**
      * @description 表单重置事件
@@ -958,7 +584,9 @@ export default {
 </script>
 <style lang="less" scoped>
 .content {
-  height: 100vh;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
   .fenqu {
     .label {
       font-size: 16px;

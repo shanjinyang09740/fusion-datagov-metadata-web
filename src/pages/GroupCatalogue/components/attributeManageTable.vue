@@ -21,6 +21,7 @@
             true-label="0"
             false-label=""
             @change="useChange(scope.row)"
+            :disabled="scope.row.isItem === '1'"
           >
           </fu-checkbox>
         </template>
@@ -36,7 +37,7 @@
         align="center"
       >
         <template slot-scope="scope">
-          <fu-select
+          <!-- <fu-select
             v-if="item.isSelect && scope.row.flag && scope.row.flag === '1'"
             clearable
             v-model="scope.row[item.prop]"
@@ -44,21 +45,21 @@
             @change="valueChange(scope.row)"
           >
             <fu-option
-              v-for="i in item.option"
+              v-for="i in dataTypeOption"
               :key="i.value"
               :value="i.value"
               :label="i.text"
             ></fu-option>
-          </fu-select>
-          <div v-else-if="item.prop === 'attrType' && !scope.row.flag">
+          </fu-select> -->
+          <div v-if="item.prop === 'attrType'">
             {{ transformType(scope.row[item.prop]) }}
           </div>
-          <fu-input
+          <!-- <fu-input
             v-else-if="item.isInput && scope.row.flag && scope.row.flag === '1'"
             v-model="scope.row[item.prop]"
             size="mini"
             @change="valueChange(scope.row)"
-          ></fu-input>
+          ></fu-input> -->
           <div v-else>
             {{ scope.row[item.prop] }}
           </div>
@@ -77,12 +78,12 @@
               :src="require('@/assets/images/move-down.svg')"
               @click.stop="downMove(scope.row, scope.$index)"
             />
-            <i
+            <!-- <i
               v-if="scope.row.flag === '1'"
               class="iconfont iconbiaoge_shanchu"
               title="删除"
               @click.stop="deleteZb(scope.$index)"
-            ></i>
+            ></i> -->
           </div>
         </template>
       </fu-table-column>
@@ -91,10 +92,10 @@
 </template>
 <script>
 import {
-  Select,
-  Option,
-  Button,
-  Input,
+  // Select,
+  // Option,
+  // Button,
+  // Input,
   TableColumn,
   Table,
   Checkbox,
@@ -104,12 +105,13 @@ import {
   getItemizeDetail,
   getAttributeTable,
 } from "@/service/modules/labelManage.js";
+import { postJSON } from "@/utils/post";
 export default {
   components: {
-    FuSelect: Select,
-    FuOption: Option,
-    FuButton: Button,
-    FuInput: Input,
+    // FuSelect: Select,
+    // FuOption: Option,
+    // FuButton: Button,
+    // FuInput: Input,
     FuTableColumn: TableColumn,
     FuTable: Table,
     FuCheckbox: Checkbox,
@@ -128,64 +130,48 @@ export default {
   },
   data() {
     return {
+      // 数据类型
+      dataTypeOption: [],
       tableData: {
         column: [
-          // {
-          //   label: "代码",
-          //   prop: "attrCode",
-          //   width: "100px",
-          // },
+          {
+            label: "编码",
+            prop: "code",
+            width: "100px",
+          },
           {
             label: "中文名",
-            prop: "attrName",
+            prop: "label",
             width: "100px",
             isInput: true,
           },
           {
             label: "简称",
-            prop: "attrAlias",
+            prop: "abbreviation",
             width: "100px",
             isInput: true,
           },
           {
             label: "英文名",
-            prop: "attrCode",
+            prop: "name",
             width: "100px",
             isInput: true,
           },
           {
             label: "说明",
-            prop: "attrExplain",
+            prop: "description",
             width: "100px",
             isInput: true,
           },
           {
             label: "数据类型",
-            prop: "attrType",
+            prop: "attributeDataType",
             width: "100px",
             isSelect: true,
-            option: [
-              {
-                text: "基础属性",
-                value: "1",
-              },
-              {
-                text: "数据属性",
-                value: "2",
-              },
-              {
-                text: "管理属性",
-                value: "3",
-              },
-              {
-                text: "技术属性",
-                value: "4",
-              },
-            ],
           },
           {
             label: "最大长度",
-            prop: "attrLength",
+            prop: "length",
             width: "100px",
             isInput: true,
           },
@@ -205,18 +191,11 @@ export default {
   },
   methods: {
     transformType(val) {
-      switch (val) {
-        case "1":
-          return "基础属性";
-        case "2":
-          return "数据属性";
-        case "3":
-          return "管理属性";
-        case "4":
-          return "技术属性";
-        default:
-          return val;
-      }
+      this.dataTypeOption.forEach((element) => {
+        if (element.value === "val") {
+          return element.text;
+        }
+      });
     },
     /**
      * @description 是否启用修改
@@ -231,9 +210,6 @@ export default {
       //     }
       //   }
       // }
-    },
-    rowClick(row, column, event) {
-      // 当前点击行的id
     },
     /**
      * @description 表格修改
@@ -283,10 +259,6 @@ export default {
      */
     upMove(row, index) {
       let data = this.tableData.rows[index - 1];
-      let sort1 = row.sortNum;
-      let sort2 = data.sortNum;
-      this.$set(row, "sortNum", sort2);
-      this.$set(data, "sortNum", sort1);
       this.tableData.rows.splice(index - 1, 1);
       this.tableData.rows.splice(index, 0, data);
     },
@@ -294,11 +266,6 @@ export default {
      * @description 下移
      */
     downMove(row, index) {
-      let data = this.tableData.rows[index + 1];
-      let sort1 = row.sortNum;
-      let sort2 = data.sortNum;
-      this.$set(row, "sortNum", sort2);
-      this.$set(data, "sortNum", sort1);
       this.tableData.rows.splice(index, 1);
       this.tableData.rows.splice(index + 1, 0, row);
     },

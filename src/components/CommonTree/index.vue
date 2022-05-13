@@ -35,7 +35,7 @@
     >
       <span class="custom-tree-node" slot-scope="{ data }">
         <span>
-          <img :src="getImage()" width="16px" height="14px" />
+          <img :src="getImage(data.statIndctFolderType)" />
           &nbsp;
           <span :class="[data.status === '1' ? 'highlight' : '']">{{
             data[defaultProps.label]
@@ -202,8 +202,13 @@ export default {
   beforeDestroy() {},
   destroyed() {},
   methods: {
-    getImage() {
-      return require("./images/folderIcon-mr.png");
+    getImage(type) {
+      switch (type) {
+        case "0":
+          return require("./images/themeIcon-mr.svg");
+        case "1":
+          return require("./images/folderIcon-mr.png");
+      }
     },
     /**
      * @description 节点过滤方法
@@ -425,6 +430,12 @@ export default {
 </script>
 
 <style lang="less" scoped>
+.custom-tree-node {
+  img {
+    height: 16px;
+    width: 16px;
+  }
+}
 .treeTop {
   display: flex;
   justify-content: space-between;

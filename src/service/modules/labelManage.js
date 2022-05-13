@@ -16,17 +16,12 @@ const getPartitionSelect = () => {
 };
 /**
  * @description 获取分组目录树
- * @param partCode 分区code
- * @param type 分组 group 目录 catalog
  * @returns
  */
-const getGroupTree = (partCode, type) => {
-  return postJSON("/api/meta/v1/baseCodeList/queryFolderTree.do", {
+const getGroupTree = () => {
+  return postJSON("/api/meta/v1/groups/t2tree/query.do", {
     postData: JSON.stringify({
-      data: [
-        { name: "partCode", vtype: "attr", data: partCode },
-        { name: "type", vtype: "attr", data: type },
-      ],
+      data: [],
     }),
   });
 };
@@ -47,38 +42,17 @@ const getFolderInfo = ({ partCode, folderId }) => {
   });
 };
 /**
- * @description 保存文件夹
+ * @description 保存分类
  * @returns
  */
-const saveFolder = (
-  url,
-  {
-    level,
-    partitionCode,
-    partitionName,
-    statGroupFolderId,
-    statGroupFolderLabel,
-    statGroupFolderCode,
-    statGroupFolderPid,
-    statGroupFolderType,
-  }
-) => {
+const saveFolder = (url, data) => {
   return postJSON(url, {
     postData: JSON.stringify({
       data: [
         {
-          name: "folder",
+          name: "type",
           vtype: "json",
-          data: {
-            level: level,
-            partitionCode: partitionCode,
-            partitionName: partitionName,
-            statGroupFolderId: statGroupFolderId,
-            statGroupFolderLabel: statGroupFolderLabel,
-            statGroupFolderCode: statGroupFolderCode,
-            statGroupFolderPid: statGroupFolderPid,
-            statGroupFolderType: statGroupFolderType,
-          },
+          data: data,
         },
       ],
     }),
@@ -88,14 +62,14 @@ const saveFolder = (
  * @description 保存主题
  * @returns
  */
-const saveTheme = (themeFrom) => {
-  return postJSON(REQ.saveThemeUrl, {
+const saveTheme = (url, data) => {
+  return postJSON(url, {
     postData: JSON.stringify({
       data: [
         {
-          vtype: "formpanel",
-          name: "form",
-          data: themeFrom,
+          name: "theme",
+          vtype: "json",
+          data: data,
         },
       ],
     }),
@@ -105,14 +79,19 @@ const saveTheme = (themeFrom) => {
  * @description 保存分组
  * @returns
  */
-const saveGroup = (url, name, from) => {
+const saveGroup = (url, type, from) => {
   return postJSON(url, {
     postData: JSON.stringify({
       data: [
         {
-          name: name,
-          vtype: "json",
+          name: "group",
+          vtype: "formpanel",
           data: from,
+        },
+        {
+          name: "statGroupType",
+          vtype: "attr",
+          data: type,
         },
       ],
     }),
@@ -167,14 +146,26 @@ const getItemizeTableData = (id) => {
   });
 };
 /**
- * @description 获取分项详情
- * @param {String} id
+ * @description 复制分组
+ * @param {String} statGroupId
+ * @param {String} uplevel
  * @returns
  */
-const getItemizeDetail = (id) => {
-  return postJSON("", {
+const copyGroup = (statGroupId, uplevel) => {
+  return postJSON("/api/meta/v1/groups/group/copy.do", {
     postData: JSON.stringify({
-      data: [{ vtype: "attr", name: "id", data: id }],
+      data: [
+        {
+          name: "statGroupId",
+          vtype: "attr",
+          data: statGroupId,
+        },
+        {
+          name: "uplevel",
+          vtype: "attr",
+          data: uplevel,
+        },
+      ],
     }),
   });
 };
@@ -184,38 +175,68 @@ const getItemizeDetail = (id) => {
  * @returns
  */
 const deleteGroup = (id) => {
-  return postJSON("/api/meta/v1/baseCodeList/delGroup.do", {
+  return postJSON("/api/meta/v1/groups/group/delete.do", {
     postData: JSON.stringify({
-      data: [{ vtype: "attr", name: "groupId", data: id }],
+      data: [{ vtype: "attr", name: "statGroupId", data: id }],
     }),
   });
 };
 /**
- * @description 上移下移分组
+ * @description 分组移动至其他文件夹
  * @param
  * @returns
  */
-const moveUpDownItem = ({ upId, upNum, downId, downNum }) => {
-  return postJSON("/api/meta/v1/baseCodeList/exchangeGroup.do", {
+const move = ({ folderId, ids }) => {
+  return postJSON("/api/meta/v1/groups/group/move.do", {
     postData: JSON.stringify({
       data: [
-        { name: "upId", vtype: "attr", data: upId },
-        { name: "upNum", vtype: "attr", data: upNum },
-        { name: "downId", vtype: "attr", data: downId },
-        { name: "downNum", vtype: "attr", data: downNum },
+        {
+          name: "statGroupTypeId",
+          vtype: "attr",
+          data: folderId,
+        },
+        {
+          name: "ids",
+          vtype: "attr",
+          data: ids,
+        },
       ],
     }),
   });
 };
 /**
- * @description 删除文件夹
+ * @description 删除分类
  * @param {String} id
  * @returns
  */
 const deleteFolder = (id) => {
-  return postJSON("/api/meta/v1/baseCodeList/delFolder.do", {
+  return postJSON("/api/meta/v1/groups/type/delete.do", {
     postData: JSON.stringify({
-      data: [{ vtype: "attr", name: "folderId", data: id }],
+      data: [
+        {
+          name: "statGroupTypeId",
+          vtype: "attr",
+          data: id,
+        },
+      ],
+    }),
+  });
+};
+/**
+ * @description 删除主题
+ * @param {String} id
+ * @returns
+ */
+const deleteTheme = (id) => {
+  return postJSON("/api/meta/v1/groups/theme/delete.do", {
+    postData: JSON.stringify({
+      data: [
+        {
+          name: "statGroupThemeId",
+          vtype: "attr",
+          data: id,
+        },
+      ],
     }),
   });
 };
@@ -280,7 +301,7 @@ const deleteAreacontent = (id) => {
  * @description 获取分项新增时生成对应的编码和id值
  * @returns
  */
-const getCodeId = (id) => {
+const getCodeId = () => {
   return postJSON("/api/meta/v1/group/item/random.do", {
     postData: JSON.stringify({
       data: [
@@ -348,12 +369,12 @@ const saveAttribute = ({ statGroupId, statGroupCode, tableData }) => {
   });
 };
 /**
- * @description 保存分项管理属性列表
+ * @description 保存分项列表
  * @param {Array} tableData
  * @param {Array} ids 初始化分项id 的集合
  * @returns
  */
-const saveItemize = ({ tableData, ids }) => {
+const saveItemize = ({ tableData, ids, statGroupId, statGroupCode }) => {
   return postJSON("/api/meta/v1/group/item/save.do", {
     postData: JSON.stringify({
       data: [
@@ -367,12 +388,36 @@ const saveItemize = ({ tableData, ids }) => {
           vtype: "json",
           data: ids,
         },
+        {
+          name: "statGroupCode",
+          vtype: "attr",
+          data: statGroupCode,
+        },
+        { name: "statGroupId", vtype: "attr", data: statGroupId },
+      ],
+    }),
+  });
+};
+/**
+ * @description 查询分项详情
+ * @returns
+ */
+const queryItemizeDetail = (queryId) => {
+  return postJSON(`/api/meta/v1/group/detail.do`, {
+    postData: JSON.stringify({
+      data: [
+        {
+          name: "statGroupId",
+          vtype: "attr",
+          data: queryId,
+        },
       ],
     }),
   });
 };
 
 export {
+  queryItemizeDetail,
   saveItemize,
   getCodeId,
   getPartitionSelect,
@@ -380,19 +425,20 @@ export {
   saveFolder,
   saveTheme,
   saveGroup,
+  copyGroup,
   getCreateGroupFrom,
   getCreateItemizeFrom,
   getGroupTree,
   getItemizeTableData,
   getItemizeTableColumn,
-  getItemizeDetail,
   deleteGroup,
   deleteFolder,
+  deleteTheme,
   getAreaTree,
   saveAreaTree,
   deleteAreaTree,
   deleteAreacontent,
-  moveUpDownItem,
+  move,
   getItemizeTable,
   getAttributeTable,
   saveAttribute,

@@ -18,14 +18,19 @@
           ></fu-option>
         </fu-select>
       </template> -->
-      <fu-button type="primary" size="medium" @click="createTheme"
-        >新建主题</fu-button
-      >
-      <fu-button type="primary" size="medium" @click="createFolder"
-        >新建分类</fu-button
-      >
+      <div class="header-left">
+        <fu-button type="primary" size="medium" @click="createTheme"
+          >新建主题</fu-button
+        >
+        <fu-button type="primary" size="medium" @click="createFolder"
+          >新建分类</fu-button
+        >
+      </div>
       <fu-button type="primary" size="medium" @click="createGroup"
-        >新建分组</fu-button
+        >新建{{ typeCh }}</fu-button
+      >
+      <fu-button size="medium" type="primary" class="left-mg10" @click="move"
+        >移动</fu-button
       >
       <fu-button
         size="medium"
@@ -35,10 +40,10 @@
         >删除</fu-button
       >
       <fu-button size="medium" class="right" type="text" @click="exportGroup"
-        >导出分组</fu-button
+        >导出{{ typeCh }}</fu-button
       >
       <fu-button size="medium" class="right" type="text" @click="importGroup"
-        >导入分组</fu-button
+        >导入{{ typeCh }}</fu-button
       >
     </div>
     <div class="content">
@@ -82,52 +87,67 @@
           :reqParams="reqTableParams"
           :fuColumn="fuColumn"
           :isHasSelection="true"
-          :operationWidth="'300px'"
+          :operationWidth="'320px'"
+          @deliverySelection="deliverySelection"
         >
           <template slot-scope="row" slot="one">
             <div class="operateBtns">
-              <i
-                class="iconfont iconbiaoge_chakanshuju"
-                title="查看"
-                @click.stop="lookGroup(row.data)"
-              ></i>
-              <i
-                class="iconfont iconbiaoge_bianji"
-                title="编辑"
+              <fu-button
+                type="text"
+                icon="iconfont iconbiaoge_bianji"
                 @click.stop="editGroup(row.data)"
-              ></i>
-              <i
-                class="iconfont iconbiaoge_shujuduizhao"
-                title="管理分项"
+                >编辑</fu-button
+              >
+              <fu-button
+                type="text"
+                icon="iconfont iconbiaoge_shujuduizhao"
                 @click.stop="itemizedManage(row.data)"
-              ></i>
-              <i
-                class="iconfont iconbiaoge_xieyuanguanxi"
-                title="查看血缘"
-                @click.stop="viewBloodItem(row.data)"
-              ></i>
-              <i
-                class="iconfont iconbiaoge_shanchu"
-                title="删除"
+                >管理分项</fu-button
+              >
+              <fu-button
+                type="text"
+                icon="iconfont iconbiaoge_shanchu"
                 @click.stop="deleteGroup('id', row.data)"
-              ></i>
-              <img
-                title="上移"
-                :src="require('@/assets/images/move-up.svg')"
-                @click.stop="moveUpItem(row.data, row.index)"
-              />
-              <img
-                title="下移"
-                :src="require('@/assets/images/move-down.svg')"
-                @click.stop="moveDownItem(row.data, row.index)"
-              />
+                >删除</fu-button
+              >
+              <el-dropdown>
+                <span class="el-dropdown-link">
+                  更多<i class="el-icon-arrow-down el-icon--right"></i>
+                </span>
+                <el-dropdown-menu slot="dropdown">
+                  <el-dropdown-item
+                    ><fu-button
+                      @click.stop="copyGroup(row.data, 'no', '复制')"
+                      type="text"
+                      icon="iconfont iconqita_yingshe"
+                      >复制</fu-button
+                    ></el-dropdown-item
+                  >
+                  <el-dropdown-item
+                    ><fu-button
+                      @click.stop="copyGroup(row.data, 'yes', '创建')"
+                      type="text"
+                      icon="iconfont iconqita_zidingyi"
+                      >创建新版本</fu-button
+                    ></el-dropdown-item
+                  >
+                  <el-dropdown-item
+                    ><fu-button
+                      @click.stop="viewBloodItem(row.data)"
+                      type="text"
+                      icon="iconfont iconbiaoge_xieyuanguanxi"
+                      >查看血缘</fu-button
+                    ></el-dropdown-item
+                  >
+                </el-dropdown-menu>
+              </el-dropdown>
             </div>
           </template>
         </component-table>
       </div>
     </div>
     <fu-dialog
-      title="新建主题"
+      :title="themeTitle"
       width="500px"
       :visible.sync="themeDialogVisible"
       :close-on-click-modal="false"
@@ -143,13 +163,24 @@
           <fu-input
             v-model="themeForm.themeName"
             placeholder="请输入"
+            size="medium"
           ></fu-input>
         </fu-form-item>
         <fu-form-item label="主题代码：" prop="themeCode">
           <fu-input
             v-model="themeForm.themeCode"
             placeholder="请输入"
+            size="medium"
+            :disabled="themeTitle === '编辑主题'"
           ></fu-input>
+        </fu-form-item>
+        <fu-form-item label="顺序：" prop="sortNum">
+          <fu-input-number
+            v-model="themeForm.sortNum"
+            controls-position="right"
+            :min="0"
+            size="medium"
+          ></fu-input-number>
         </fu-form-item>
       </fu-form>
       <span slot="footer">
@@ -170,17 +201,13 @@
         label-width="140px"
         :fu-data="folderForm"
       >
-        <fu-form-item
-          v-if="folderTitle === '新建分类'"
-          label="上级主题或分类："
-          prop="selectTreeValue"
-          required
-        >
+        <fu-form-item label="上级主题或分类：" prop="selectTreeValue">
           <common-select-tree
-            ref="CommonSelectTree"
-            :checkStrictly="true"
-            :onlyCheckleaf="false"
-            :fuData="selectTreeData"
+            v-model="folderForm.selectTreeValue"
+            :treeData="treeData"
+            :defaultProps="defaultProps"
+            :checkedNode="folder"
+            @getThemeId="getThemeId"
           ></common-select-tree>
         </fu-form-item>
         <fu-form-item label="分类名称：" prop="folderName">
@@ -195,12 +222,47 @@
             v-model="folderForm.folderCode"
             placeholder="请输入"
             size="medium"
+            :disabled="folderTitle === '编辑分类'"
           ></fu-input>
+        </fu-form-item>
+        <fu-form-item label="顺序：" prop="sortNum">
+          <fu-input-number
+            v-model="folderForm.sortNum"
+            controls-position="right"
+            :min="0"
+            size="medium"
+          ></fu-input-number>
         </fu-form-item>
       </fu-form>
       <span slot="footer">
         <fu-button type="primary" @click="submitFolder">确定</fu-button>
         <fu-button @click="closeFolderDialog">取消</fu-button>
+      </span>
+    </fu-dialog>
+    <fu-dialog
+      title="分组移动"
+      width="500px"
+      :visible.sync="moveDialogVisible"
+      :close-on-click-modal="false"
+      @close="closeMoveDialog"
+    >
+      <fu-form ref="moveForm" label-width="140px" :fu-data="moveForm">
+        <fu-form-item label="当前文件夹：" prop="folderName">
+          {{ folder.label }}
+        </fu-form-item>
+        <fu-form-item label="目标文件夹：" prop="selectTreeValue">
+          <common-select-tree
+            ref="ComSelectTree"
+            :treeData="moveTreeData"
+            v-model="moveForm.selectTreeValue"
+            :defaultProps="defaultProps"
+            :checkedNode="folder"
+          ></common-select-tree>
+        </fu-form-item>
+      </fu-form>
+      <span slot="footer">
+        <fu-button type="primary" @click="submitMove">确定</fu-button>
+        <fu-button @click="closeMoveDialog">取消</fu-button>
       </span>
     </fu-dialog>
     <fu-dialog
@@ -233,6 +295,7 @@
       title="管理分项"
       top="1vh"
       width="90%"
+      v-if="isShowItemizedManage"
       :visible.sync="isShowItemizedManage"
       :close-on-click-modal="false"
       :append-to-body="true"
@@ -243,13 +306,9 @@
         :groupId="groupId"
         :groupCode="group.statGroupCode"
       ></itemized-manage>
-      <span slot="footer">
-        <fu-button type="primary" @click="submitItemizedManage">确定</fu-button>
-        <fu-button @click="closeItemizedManage">取消</fu-button>
-      </span>
     </fu-dialog>
     <fu-dialog
-      title="导入分组"
+      :title="`导入${typeCh}`"
       top="5vh"
       width="400px"
       :visible.sync="isShowUpload"
@@ -260,8 +319,9 @@
       <el-upload
         class="upload-demo"
         drag
-        action="/api/meta/v1/codelist/import.do"
+        action="/api/meta/v1/attach/upload.do"
         :data="uploadData"
+        :on-success="onSuccess"
         multiple
       >
         <i class="el-icon-upload"></i>
@@ -281,10 +341,10 @@ import {
   Form,
   FormItem,
   Dialog,
-  Radio,
   Message,
+  InputNumber,
 } from "fusion-ui";
-import CommonSelectTree from "@/components/CommonSelectTree";
+import CommonSelectTree from "./components/selectTree.vue";
 import ComponentTree from "@/components/CommonTree";
 import ComponentTable from "@/components/CommonTable";
 import GroupTabs from "@/components/CreateGroupFrom";
@@ -294,13 +354,16 @@ import {
   getPartitionSelect,
   saveFolder,
   saveGroup,
+  copyGroup,
   deleteFolder,
+  deleteTheme,
   deleteGroup,
   getGroupTree,
-  getFolderInfo,
-  moveUpDownItem,
   saveItemize,
+  saveTheme,
+  move,
 } from "@/service/modules/labelManage.js";
+import { postJSON } from "@/utils/post";
 export default {
   name: "",
   components: {
@@ -309,7 +372,7 @@ export default {
     FuForm: Form,
     FuFormItem: FormItem,
     FuDialog: Dialog,
-    FuRadio: Radio,
+    FuInputNumber: InputNumber,
     CommonSelectTree,
     ComponentTree,
     ComponentTable,
@@ -329,14 +392,13 @@ export default {
       }
     };
     return {
-      saveDragReq: {
-        url: "/api/meta/v1/baseCodeList/dragFolderTree.do",
-        params: [],
-      },
+      // 上传的文件id
+      upLoadId: "",
       // 区分微观与宏观页面
       pageType: "",
       // 区分分组与目录
       type: "",
+      typeCh: "分组",
       // 分区
       partition: "",
       partitionOptions: [],
@@ -344,10 +406,11 @@ export default {
       searchText: "",
       defaultProps: {
         children: "children",
-        label: "statGroupFolderLabel",
-        id: "statGroupFolderId",
+        label: "label",
+        id: "id",
       },
       treeData: [],
+      moveTreeData: [],
       expandNodes: [],
       rightClickList: [
         {
@@ -363,7 +426,7 @@ export default {
       ],
       // 当前节点id
       nodeId: "",
-      folder: "",
+      folder: {},
       // 当前节点类型
       nodeType: "",
       // 查询表单
@@ -399,7 +462,7 @@ export default {
           align: "center",
         },
         {
-          prop: "groupType",
+          prop: "statGroupType",
           label: "类型",
           width: "50px",
           align: "center",
@@ -411,13 +474,7 @@ export default {
           align: "center",
         },
         {
-          prop: "creatorId",
-          label: "汇总类型",
-          width: "50px",
-          align: "center",
-        },
-        {
-          prop: "isUsed",
+          prop: "statGroupStatus",
           label: "状态",
           width: "50px",
           align: "center",
@@ -426,9 +483,11 @@ export default {
       // 新建主题弹框
       themeDialogVisible: false,
       themeForm: {
+        sortNum: "",
         themeName: "",
         themeCode: "",
       },
+      themeTitle: "",
       themeRules: {
         themeName: [
           { required: true, message: "请填写主题名称", trigger: "blur" },
@@ -436,6 +495,7 @@ export default {
         themeCode: [
           { required: true, message: "请填写主题代码", trigger: "blur" },
         ],
+        sortNum: [{ required: true, message: "请填写顺序", trigger: "blur" }],
       },
       // 新建分组
       title: "",
@@ -447,51 +507,77 @@ export default {
       folderTitle: "",
       folderDialogVisible: false,
       folderForm: {
-        state: "",
+        sortNum: "",
         folderName: "",
         folderCode: "",
+        selectTreeValue: "",
       },
       folderRules: {
+        selectTreeValue: [
+          {
+            required: true,
+            message: "请选择上级分类或主题",
+            trigger: "change",
+          },
+        ],
         folderName: [
           { required: true, message: "请填写分类名称", trigger: "blur" },
         ],
         folderCode: [
           { required: true, validator: validatePass, trigger: "blur" },
         ],
-        state: [{ required: true, message: "请选择层级", trigger: "change" }],
+        sortNum: [{ required: true, message: "请填写顺序", trigger: "blur" }],
       },
-      selectTreeData: [],
       // 管理分项
       isShowItemizedManage: false,
       // 导入分组
       isShowUpload: false,
+      // 移动弹框显示控制
+      moveDialogVisible: false,
+      moveForm: {
+        folderName: "",
+        selectTreeValue: "",
+      },
+      themeId: "",
+      // 分组树list数据，方便遍历
+      GroupTreedata: "",
+      // 分组表格选中行的id集合
+      selectionId: [],
     };
   },
   computed: {
     uploadData() {
-      return { fileId: this.nodeId };
+      return {};
     },
     // 表格
     reqTableUrl() {
       if (!this.nodeId) {
         return "";
       }
-      return `/api/meta/v1/group/list.do`;
+      return `/api/meta/v1/groups/group/list.do`;
     },
     reqTableParams() {
       if (this.nodeId) {
         return [
           {
-            name: "group",
-            vtype: "json",
-            data: {
-              folderType: this.type === "group" ? "0" : "1", //目录还是分组 0
-              partitionCode: this.partition, //当前的分区code 1
-              nodeId: this.nodeId, //当前的结点id
-              groupTag: this.queryForm.label, //动态查询条件名称或者编码
-              groupStatus: this.queryForm.isUsed, //动态查询条件分组的状态
-              groupType: this.queryForm.groupType, //动态查询条件分组的类型
-            },
+            name: "id",
+            vtype: "attr",
+            data: this.nodeId,
+          },
+          {
+            name: "nameCode",
+            vtype: "attr",
+            data: this.queryForm.label,
+          },
+          {
+            name: "hasChildren",
+            vtype: "attr",
+            data: "no",
+          },
+          {
+            name: "statGroupType",
+            vtype: "attr",
+            data: this.type === "group" ? "1,3" : "2",
           },
         ];
       } else {
@@ -499,41 +585,27 @@ export default {
       }
     },
   },
+  watch: {
+    type: {
+      handler(val) {
+        if (val === "group") {
+          this.typeCh = "分组";
+        } else if (val === "catalog") {
+          this.typeCh = "目录";
+        }
+      },
+    },
+    // GroupTreedata: {
+    //   handler(val) {},
+    //   immediate: true,
+    // },
+  },
   created() {
     this.type = getUrl("type");
-    this.getPartitionSelect();
+    this.getGroupTree();
   },
+  mounted() {},
   methods: {
-    /**
-     * @description 上移
-     */
-    moveUpItem(data, index) {
-      let tableData = this.$refs["groupTable"].$children[0].data.rows;
-      let params = {
-        upId: data.statGroupId,
-        upNum: tableData[index - 1].sortNum,
-        downId: tableData[index - 1].statGroupId,
-        downNum: data.sortNum,
-      };
-      moveUpDownItem(params).then((res) => {
-        this.$refs["groupTable"].$children[0].queryData();
-      });
-    },
-    /**
-     * @description 下移
-     */
-    moveDownItem(data, index) {
-      let tableData = this.$refs["groupTable"].$children[0].data.rows;
-      let params = {
-        upId: data.statGroupId,
-        upNum: tableData[index + 1].sortNum,
-        downId: tableData[index + 1].statGroupId,
-        downNum: data.sortNum,
-      };
-      moveUpDownItem(params).then((res) => {
-        this.$refs["groupTable"].$children[0].queryData();
-      });
-    },
     /**
      * @description 分区
      */
@@ -552,10 +624,18 @@ export default {
      * @description 分组树
      */
     getGroupTree() {
-      getGroupTree(this.partition, this.type)
+      getGroupTree()
         .then((res) => {
-          let data = res.data[0].data;
-          this.treeData = this.transformTozTreeFormat(data);
+          this.GroupTreedata = res.data[0].data;
+          let tree = JSON.parse(JSON.stringify(this.GroupTreedata));
+          let moveTree = JSON.parse(JSON.stringify(this.GroupTreedata));
+          this.treeData = this.transformTozTreeFormat(tree);
+          moveTree.forEach((item) => {
+            if (item.id === item.statGroupThemeId) {
+              this.$set(item, "disabled", true);
+            }
+          });
+          this.moveTreeData = this.transformTozTreeFormat(moveTree);
         })
         .catch((err) => {
           console.log(err);
@@ -592,31 +672,29 @@ export default {
       return node.children;
     },
     nodeClick(data) {
-      this.nodeId = data.statGroupFolderId;
+      this.nodeId = data.id;
       this.nodeType = data.statGroupFolderType;
       this.folder = data;
     },
     // 编辑节点
     editTree(data) {
-      console.log(data);
-      this.folderTitle = "编辑分类";
-      getFolderInfo({
-        partCode: this.partition,
-        folderId: data.statGroupFolderId,
-      }).then((res) => {
-        let data = res.data[0].data;
-        if (data.statGroupFolderType === "0") {
-          this.themeDialogVisible = true;
-          this.$set(this.themeForm, "id", data.statGroupFolderId);
-          this.themeForm.themeName = data.statGroupFolderLabel;
-          this.themeForm.themeCode = data.statGroupFolderCode;
-        } else {
-          this.folderDialogVisible = true;
-          this.$set(this.folderForm, "id", data.statGroupFolderId);
-          this.folderForm.folderName = data.statGroupFolderLabel;
-          this.folderForm.folderCode = data.statGroupFolderCode;
-        }
-      });
+      this.folder = data;
+      if (data.id === data.statGroupThemeId) {
+        this.themeTitle = "编辑主题";
+        this.themeDialogVisible = true;
+        this.$set(this.themeForm, "id", data.id);
+        this.themeForm.themeName = data.label;
+        this.themeForm.themeCode = data.statGroupThemeCode;
+        this.themeForm.sortNum = data.statGroupThemeSortNum;
+      } else {
+        this.folderTitle = "编辑分类";
+        this.folderDialogVisible = true;
+        this.$set(this.folderForm, "id", data.id);
+        this.folderForm.folderName = data.label;
+        this.folderForm.folderCode = data.statGroupTypeCode;
+        this.folderForm.sortNum = data.statGroupTypeSortNum;
+        this.folderForm.selectTreeValue = data.pId;
+      }
     },
     // 删除节点
     deleteTree(data) {
@@ -626,16 +704,29 @@ export default {
         type: "warning",
       })
         .then(() => {
-          deleteFolder(data.statGroupFolderId)
-            .then((res) => {
-              if (res.data[0].data) {
-                Message.success("删除成功!");
-                this.getGroupTree();
-              }
-            })
-            .catch((err) => {
-              Message.error(`删除失败!，${err.errorMessage}`);
-            });
+          if (data.id === data.statGroupThemeId) {
+            deleteTheme(data.id)
+              .then((res) => {
+                if (res.data[0].data) {
+                  Message.success("删除成功!");
+                  this.getGroupTree();
+                }
+              })
+              .catch((err) => {
+                Message.error(`删除失败!，${err.errorMessage}`);
+              });
+          } else {
+            deleteFolder(data.id)
+              .then((res) => {
+                if (res.data[0].data) {
+                  Message.success("删除成功!");
+                  this.getGroupTree();
+                }
+              })
+              .catch((err) => {
+                Message.error(`删除失败!，${err.errorMessage}`);
+              });
+          }
         })
         .catch(() => {
           this.$message({
@@ -648,6 +739,7 @@ export default {
      * @description 新建主题
      */
     createTheme() {
+      this.themeTitle = "新建主题";
       this.themeDialogVisible = true;
     },
     /**
@@ -657,16 +749,14 @@ export default {
       this.folderTitle = "新建分类";
       this.folderDialogVisible = true;
       if (this.folder) {
-        this.$refs["CommonSelectTree"].$refs[
-          "SelectTreeComponent"
-        ].setCheckedNodes(this.folder);
+        this.folderForm.selectTreeValue = this.folder.id;
       }
     },
     /**
      * @description 新建分组
      */
     createGroup() {
-      if (!this.folder) {
+      if (!this.folder || this.folder.id === this.folder.statGroupThemeId) {
         Message.warning("请选择分类");
         return;
       }
@@ -681,26 +771,22 @@ export default {
       this.$refs["themeForm"].$refs.el.resetFields();
     },
     /**
-     * @description 保存新建主题
+     * @description 保存新建编辑主题
      */
     submitTheme() {
       this.$refs["themeForm"].$refs.el.validate(async (valid) => {
         if (valid) {
-          let params = {
-            level: 1,
-            partitionCode: this.folder.partitionCode,
-            partitionName: this.folder.partitionName,
-            statGroupFolderId: this.themeForm.id || "",
-            statGroupFolderLabel: this.themeForm.themeName,
-            statGroupFolderCode: this.themeForm.themeCode,
-            statGroupFolderPid: "0",
-            statGroupFolderType: "0",
-          };
-          let url = "/api/meta/v1/baseCodeList/addFolder.do";
+          let url = "/api/meta/v1/groups/theme/create.do";
           if (this.themeForm.id) {
-            url = "/api/meta/v1/baseCodeList/editFolder.do";
+            url = "/api/meta/v1/groups/theme/update.do";
           }
-          saveFolder(url, params)
+          let params = {
+            statGroupThemeId: this.themeForm.id || "",
+            statGroupThemeName: this.themeForm.themeName,
+            statGroupThemeCode: this.themeForm.themeCode,
+            statGroupThemeSortNum: this.themeForm.sortNum,
+          };
+          saveTheme(url, params)
             .then((res) => {
               this.closeThemeDialog();
               Message.success("保存成功");
@@ -718,21 +804,20 @@ export default {
      */
     submit() {
       let data = {};
+      let statGroupType = "";
       let baseForm = this.$refs["groupDialog"].baseForm;
       Object.assign(data, baseForm);
       if (this.type === "catalog") {
-        this.$set(data, "statGroupType", "1"); // 目录
+        statGroupType = "2"; // 目录
+      } else {
+        statGroupType = data.stat_group_type;
       }
-      this.$set(data, "statGroupFolderId", this.nodeId);
-      this.$set(data, "partitionCode", this.folder.partitionCode);
-      this.$set(data, "partitionName", this.folder.partitionName);
-      this.$delete(data, "statGroupUpdateDate");
-      this.$delete(data, "statGroupCreatDate");
-      let url = "/api/meta/v1/baseCodeList/addGroup.do";
-      if (baseForm.statGroupId) {
-        url = "/api/meta/v1/baseCodeList/editGroup.do";
+      this.$set(data, "stat_group_type_id", this.nodeId);
+      let url = "/api/meta/v1/groups/group/create.do";
+      if (baseForm.stat_group_id) {
+        url = "/api/meta/v1/groups/group/update.do";
       }
-      saveGroup(url, this.type, data)
+      saveGroup(url, statGroupType, data)
         .then((res) => {
           Message.success("保存成功");
           this.$refs["groupTable"].$children[0].queryData();
@@ -760,33 +845,22 @@ export default {
       this.$refs["folderForm"].$refs.el.resetFields();
     },
     /**
-     * @description 保存新建分类
+     * @description 保存新建编辑分类
      */
     submitFolder() {
       this.$refs["folderForm"].$refs.el.validate(async (valid) => {
         if (valid) {
-          let selectTreeValue =
-            this.$refs["CommonSelectTree"].$refs[
-              "SelectTreeComponent"
-            ].getCheckedNodes().statGroupFolderId;
-          let params = {};
-          let level = this.folder.level;
-          if (this.folderForm.state === "0") {
-            level = this.folder.level + 1;
-          }
-          params = {
-            level: level,
-            partitionCode: this.folder.partitionCode,
-            partitionName: this.folder.partitionName,
-            statGroupFolderId: this.folderForm.id || "",
-            statGroupFolderLabel: this.folderForm.folderName,
-            statGroupFolderCode: this.folderForm.folderCode,
-            statGroupFolderPid: selectTreeValue,
-            statGroupFolderType: "1",
+          let params = {
+            statGroupTypeId: this.folderForm.id || "",
+            statGroupTypeName: this.folderForm.folderName,
+            statGroupTypeCode: this.folderForm.folderCode,
+            statGroupTypeSortNum: this.folderForm.sortNum,
+            statGroupTypePid: this.folderForm.selectTreeValue,
+            statGroupThemeId: this.themeId,
           };
-          let url = "/api/meta/v1/baseCodeList/addFolder.do";
+          let url = "/api/meta/v1/groups/type/create.do";
           if (this.folderForm.id) {
-            url = "/api/meta/v1/baseCodeList/editFolder.do";
+            url = "/api/meta/v1/groups/type/update.do";
           }
           saveFolder(url, params)
             .then((res) => {
@@ -800,17 +874,25 @@ export default {
         }
       });
     },
+    // 获取主题id
+    getThemeId(val) {
+      this.themeId = val;
+    },
     /**
      * @description 删除
      */
     deleteGroup(type, row) {
       let params = "";
       if (type === "ids") {
+        if (this.selectionId.length === 0) {
+          Message.warning("请选择要删除的分组");
+          return;
+        }
         params = this.selectionId.join(",");
       } else {
         params = row.statGroupId;
       }
-      this.$confirm("此操作将永久删除该分组, 是否继续?", "提示", {
+      this.$confirm(`此操作将永久删除该${this.typeCh}, 是否继续?`, "提示", {
         confirmButtonText: "确定",
         cancelButtonText: "取消",
         type: "warning",
@@ -835,44 +917,54 @@ export default {
         });
     },
     /**
-     * @description 查看
+     * @description 复制
      */
-    lookGroup(row) {
-      this.title = "查看分组详情";
-      this.isShowDialog = true;
-      this.groupDisabled = true;
-      this.group = row;
+    copyGroup(row, uplevel, msg) {
+      copyGroup(row.statGroupId, uplevel)
+        .then((res) => {
+          Message.success(msg + "成功");
+          this.$refs["groupTable"].$children[0].queryData();
+        })
+        .catch((err) => {
+          Message.error(msg + "失败");
+        });
     },
     /**
      * @description 编辑
      */
     editGroup(row) {
-      this.title = "编辑分组详情";
-      this.isShowDialog = true;
+      this.title = `编辑${this.typeCh}详情`;
       this.group = row;
+      postJSON("/api/meta/v1/groups/group/select.do", {
+        postData: JSON.stringify({
+          data: [
+            {
+              name: "statGroupId",
+              vtype: "attr",
+              data: row.statGroupId,
+            },
+          ],
+        }),
+      }).then((res) => {
+        this.group = res.data[0].data;
+        this.isShowDialog = true;
+      });
     },
     /**
      * @description 表单查询
      */
     tableSearch() {
       this.queryForm = JSON.parse(JSON.stringify(this.searchForm));
-      let tableData = this.$refs["groupTable"].$children[0].data.rows;
-      tableData.forEach((item) => {
-        if (
-          item.statGroupNameCh.indexOf(this.searchForm.label) !== -1 ||
-          item.statGroupCode.indexOf(this.searchForm.label) !== -1
-        ) {
-          this.$set(item, "highLight", true);
-        } else {
-          this.$set(item, "highLight", false);
-        }
-      });
-      this.$refs["groupTable"].$children[0].data.rows = tableData;
     },
     /**
      * @description 重置查询表单
      */
-    resetForm() {},
+    resetForm() {
+      let tableData = this.$refs["groupTable"].$children[0].data.rows;
+      tableData.forEach((item) => {
+        this.$set(item, "highLight", false);
+      });
+    },
     /**
      * @description 管理分项
      */
@@ -884,20 +976,45 @@ export default {
     closeItemizedManage() {
       this.isShowItemizedManage = false;
     },
-    submitItemizedManage() {
-      console.log(this.$refs["itemizedManage"], 'this.$refs["itemizedManage"]');
+    /**
+     * @description 分组移动
+     */
+    move() {
+      if (this.selectionId.length === 0) {
+        Message.warning("请选择要移动的分组");
+        return;
+      }
+      this.moveDialogVisible = true;
+    },
+    closeMoveDialog() {
+      this.moveDialogVisible = false;
+      this.$refs["moveForm"].$refs.el.resetFields();
+    },
+    submitMove() {
       let params = {
-        tableData: this.$refs["itemizedManage"].$refs["itemizeTable"].tableData,
-        ids: this.$refs["itemizedManage"].ids,
+        folderId: this.moveForm.selectTreeValue,
+        ids: this.selectionId.join(","),
       };
-      saveItemize(params)
+      move(params)
         .then((res) => {
-          Message.success("保存成功");
-          this.closeItemizedManage();
+          if (res.data[0].data) {
+            this.closeMoveDialog();
+            Message.success(res.data[0].data.msg);
+            this.$refs["groupTable"].$children[0].queryData();
+          }
         })
         .catch((err) => {
-          Message.error(`保存失败，${err.errorMessage}`);
+          Message.error(`移动失败，${err.errorMessage}`);
         });
+    },
+    /**
+     * @description 表格选择触发事件
+     */
+    deliverySelection(val) {
+      console.log(val, "selection");
+      this.selectionId = val.map((i) => {
+        return i.statGroupId;
+      });
     },
     /**
      * @description 导入分组
@@ -908,13 +1025,31 @@ export default {
     closeUpload() {
       this.isShowUpload = false;
     },
-    submitUpload() {},
+    submitUpload() {
+      postJSON("/api/meta/v1/groups/import.do?fileId=" + this.upLoadId)
+        .then((res) => {
+          Message.success(res.data[0].data);
+          this.closeUpload();
+          this.$refs["groupTable"].$children[0].queryData();
+          this.getGroupTree();
+        })
+        .catch((err) => {
+          Message.error(`导入失败，${err.errorMessage}`);
+        });
+    },
+    // 分组上传成功回调
+    onSuccess(res) {
+      this.upLoadId = res.id;
+    },
     /**
      * @description 导出分组
      */
     exportGroup() {
+      let isGroup = this.type === "group" ? true : false;
+      let folderIdType =
+        this.folder.id === this.folder.statGroupThemeId ? "theme" : "type";
       window.open(
-        `/api/meta/v1/codelist/export.do?partitionCode=${this.partition}&folderId=${this.nodeId}`
+        `/api/meta/v1/groups/export.do?isGroup=${isGroup}&folderId=${this.nodeId}&folderIdType=${folderIdType}`
       );
     },
   },
@@ -931,6 +1066,10 @@ export default {
   box-sizing: border-box;
   .partition-select {
     margin-right: 50px;
+  }
+  .header-left {
+    display: inline-block;
+    width: 360px;
   }
 }
 .right {
@@ -962,6 +1101,31 @@ export default {
   img {
     cursor: pointer;
     margin-right: 10px;
+  }
+}
+.operateBtns {
+  .el-button--text {
+    padding: 0;
+    margin: 0 5px;
+
+    /deep/ .iconfont {
+      margin-right: 2px;
+    }
+    span {
+      height: 21px;
+      line-height: 21px;
+    }
+  }
+  /deep/ .el-dropdown {
+    height: 19px;
+    margin-left: 5px;
+    color: #409eff;
+  }
+  /deep/.el-dropdown-menu {
+    /deep/.el-button {
+      width: 100%;
+      text-align: left;
+    }
   }
 }
 </style>

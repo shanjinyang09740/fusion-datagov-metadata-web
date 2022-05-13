@@ -17,15 +17,11 @@
         ></fu-input>
       </fu-form-item>
     </fu-form>
-    <div class="footer">
-      <fu-button size="medium" @click="cancel">取消</fu-button>
-      <fu-button size="medium" type="primary" @click="submit">确认</fu-button>
-    </div>
   </div>
 </template>
 
 <script>
-import { Input, Button, Form, FormItem } from "fusion-ui";
+import { Input, Button, Form, FormItem, Message } from "fusion-ui";
 import http from "@/utils/http";
 
 export default {
@@ -43,8 +39,8 @@ export default {
     },
     selectedProjectItem: {
       type: Object,
-      default: () => {}
-    }
+      default: () => {},
+    },
   },
   data() {
     return {
@@ -53,7 +49,7 @@ export default {
         {
           label: "名称",
           width: "120px",
-          prop: "statIndctFolderLabel",
+          prop: "statIndctFolderName",
           type: "input",
           disabled: false,
           placeholder: "请输入名称",
@@ -68,7 +64,7 @@ export default {
         },
       ],
       diaFormRules: {
-        statIndctFolderLabel: {
+        statIndctFolderName: {
           required: true,
           message: "请输入名称",
           trigger: "blur",
@@ -92,41 +88,61 @@ export default {
   beforeDestroy() {},
   destroyed() {},
   methods: {
-    cancel() {
-      this.$emit("close");
-    },
-    submit() {
-      this.$refs.modifyForm.$refs.el.validate((valid) => {
+    /**
+     * @description 提交表单数据
+     * @params {Function} callback
+     */
+    submit(callback) {
+      this.$refs["modifyForm"].$refs.el.validate((valid) => {
         if (valid) {
-          let postData = {
-            data: [
-              {
-                data: {
-                  level: this.formData.level,
-                  partitionCode: this.selectedProjectItem.value,
-                  partitionName: this.selectedProjectItem.text,
-                  sortNum: this.formData.sortNum,
-                  statIndctFolderCode: this.formData.statIndctFolderCode,
-                  statIndctFolderId: this.formData.statIndctFolderId,
-                  statIndctFolderLabel: this.formData.statIndctFolderLabel,
-                  statIndctFolderPid: this.formData.statIndctFolderPid,
-                  statIndctFolderType: this.formData.statIndctFolderType,
-                },
-                name: "indctFolder",
-                vtype: "formpanel",
-              },
-            ],
-          };
-          http.post("/api/meta/v1/indctFolder/saveIndctFolder.do", {postData: JSON.stringify(postData)}).then(res => {
-              console.log("res...", res);
-              this.$emit("close", "confirm");
-          });
+          callback(
+            {
+              ...this.formData,
+            },
+            "EditTree"
+          );
         } else {
-          console.log("error submit!!");
-          return false;
+          Message.warning("请检查输入是否符合规则");
         }
       });
     },
+
+    // submit() {
+    //   this.$refs.modifyForm.$refs.el.validate((valid) => {
+    //     if (valid) {
+    //       let postData = {
+    //         data: [
+    //           {
+    //             data: {
+    //               level: this.formData.level,
+    //               partitionCode: this.selectedProjectItem.value,
+    //               partitionName: this.selectedProjectItem.text,
+    //               sortNum: this.formData.sortNum,
+    //               statIndctFolderCode: this.formData.statIndctFolderCode,
+    //               statIndctFolderId: this.formData.statIndctFolderId,
+    //               statIndctFolderLabel: this.formData.statIndctFolderLabel,
+    //               statIndctFolderPid: this.formData.statIndctFolderPid,
+    //               statIndctFolderType: this.formData.statIndctFolderType,
+    //             },
+    //             name: "indctFolder",
+    //             vtype: "formpanel",
+    //           },
+    //         ],
+    //       };
+    //       http
+    //         .post("/api/meta/v1/indctFolder/saveIndctFolder.do", {
+    //           postData: JSON.stringify(postData),
+    //         })
+    //         .then((res) => {
+    //           console.log("res...", res);
+    //           this.$emit("close", "confirm");
+    //         });
+    //     } else {
+    //       console.log("error submit!!");
+    //       return false;
+    //     }
+    //   });
+    // },
   },
 };
 </script>

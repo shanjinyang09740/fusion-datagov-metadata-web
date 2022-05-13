@@ -40,44 +40,19 @@
           ></advanced-query>
         </div>
         <component-table
-          v-if="isShowSearchTable"
-          row-key="statGroupId"
-          :reqUrl="reqGroupItemTableUrl"
-          :reqParams="reqGroupItemTableParams"
-          :tableId="'groupItemTable'"
-          :fuColumn="GroupItemColumn"
-          :operationWidth="'100px'"
-        >
-          <template slot-scope="row" slot="one">
-            <div class="operateBtns">
-              <i
-                v-if="row.data.groupType === '1' || row.data.groupType === '3'"
-                class="iconfont iconbiaoge_chakanshuju"
-                title="查看分组详情"
-                @click.stop="lookGroup(row.data)"
-              ></i>
-              <i
-                class="iconfont iconbiaoge_shujuduizhao"
-                title="查看分项详情"
-                @click.stop="itemizedManage(row.data)"
-              ></i>
-            </div>
-          </template>
-        </component-table>
-        <component-table
-          v-if="!isShowSearchTable"
           row-key="statGroupId"
           :reqUrl="reqTableUrl"
           :reqParams="reqTableParams"
-          :tableId="'tableId'"
+          :tableId="'groupItemTable'"
           :fuColumn="fuColumn"
           :operationWidth="'100px'"
         >
           <template slot-scope="row" slot="one">
             <div class="operateBtns">
               <i
+                v-if="row.data.type !== '分项'"
                 class="iconfont iconbiaoge_chakanshuju"
-                title="查看分组详情"
+                :title="`查看${typeCh}详情`"
                 @click.stop="lookGroup(row.data)"
               ></i>
               <i
@@ -103,6 +78,7 @@
         :disabled="groupDisabled"
         :groupId="groupId"
         :type="type"
+        :group="group"
       ></group-tabs>
       <span slot="footer">
         <fu-button @click="closeGroupDialog">取消</fu-button>
@@ -119,8 +95,8 @@
     >
       <itemized-manage
         ref="itemizedManage"
-        :groupId="groupId"
-        :groupCode="group.statGroupCode"
+        :queryId="queryId"
+        :queryType="queryType"
       ></itemized-manage>
     </fu-dialog>
   </div>
@@ -138,6 +114,7 @@ import {
   getGroupTree,
   saveItemize,
 } from "@/service/modules/labelManage.js";
+import { postJSON } from "@/utils/post";
 export default {
   name: "",
   components: {
@@ -151,10 +128,14 @@ export default {
   },
   data() {
     return {
+      // 查询分组详情或分项详情的id
+      queryId: "",
+      queryType: "",
       // 区分微观与宏观页面
       pageType: "",
       // 区分分组与目录
       type: "",
+      typeCh: "分组",
       // 分区
       partition: "",
       partitionOptions: [],
@@ -162,47 +143,15 @@ export default {
       searchText: "",
       defaultProps: {
         children: "children",
-        label: "statGroupFolderLabel",
-        id: "statGroupFolderId",
+        label: "label",
+        id: "id",
       },
-      treeData: [
-        {
-          statGroupFolderId: "1-1",
-          statGroupFolderLabel: "主题",
-          children: [
-            {
-              id: "1-1",
-              statGroupFolderId: "1-1",
-              statGroupFolderLabel: "111",
-              statGroupFolderType: "0",
-            },
-            {
-              id: "1-2",
-              statGroupFolderId: "1-2",
-              statGroupFolderLabel: "1112",
-              statGroupFolderType: "1",
-            },
-            {
-              id: "1-3",
-              statGroupFolderId: "1-3",
-              statGroupFolderLabel: "1113",
-              statGroupFolderType: "1",
-            },
-            {
-              id: "1-4",
-              statGroupFolderId: "1-4",
-              statGroupFolderLabel: "1114",
-              statGroupFolderType: "1",
-            },
-          ],
-        },
-      ],
+      treeData: [],
       expandNodes: [],
       // 当前节点id
       nodeId: "",
       // 当前节点类型
       nodeType: "",
-      isShowSearchTable: true,
       // 查询表单
       queryForm: {
         label: "",
@@ -210,7 +159,7 @@ export default {
       queryColumns: [
         {
           label: "名称/编码：",
-          modelData: "label",
+          modelDataKey: "label",
           type: "input",
           labelWidth: "120px",
           defaultValue: "",
@@ -222,7 +171,6 @@ export default {
         type: "",
         state: "",
       },
-      // 分组表格列
       fuColumn: [
         {
           prop: "statGroupNameCh",
@@ -243,7 +191,7 @@ export default {
           align: "center",
         },
         {
-          prop: "groupType",
+          prop: "statGroupType",
           label: "类型",
           width: "50px",
           align: "center",
@@ -255,20 +203,14 @@ export default {
           align: "center",
         },
         {
-          prop: "creatorId",
-          label: "汇总类型",
-          width: "50px",
-          align: "center",
-        },
-        {
-          prop: "createTime",
+          prop: "statGroupStatus",
           label: "状态",
           width: "50px",
           align: "center",
         },
       ],
-      // 分组分项表格列
-      GroupItemColumn: [
+      // 分组表格列
+      groupColumn: [
         {
           prop: "statGroupNameCh",
           label: "名称",
@@ -288,7 +230,46 @@ export default {
           align: "center",
         },
         {
-          prop: "groupType",
+          prop: "statGroupType",
+          label: "类型",
+          width: "50px",
+          align: "center",
+        },
+        {
+          prop: "statGroupVersion",
+          label: "版本",
+          width: "50px",
+          align: "center",
+        },
+        {
+          prop: "statGroupStatus",
+          label: "状态",
+          width: "50px",
+          align: "center",
+        },
+      ],
+      // 分组分项表格列
+      groupItemColumn: [
+        {
+          prop: "name",
+          label: "名称",
+          width: "50px",
+          align: "center",
+        },
+        {
+          prop: "code",
+          label: "编码",
+          width: "50px",
+          align: "center",
+        },
+        {
+          prop: "alias",
+          label: "别名",
+          width: "50px",
+          align: "center",
+        },
+        {
+          prop: "type",
           label: "类型",
           width: "50px",
           align: "center",
@@ -299,12 +280,12 @@ export default {
           width: "80px",
           align: "center",
         },
-        {
-          prop: "computed",
-          label: "计算公式",
-          width: "80px",
-          align: "center",
-        },
+        // {
+        //   prop: "computed",
+        //   label: "计算公式",
+        //   width: "80px",
+        //   align: "center",
+        // },
         {
           prop: "statGroupVersion",
           label: "版本",
@@ -312,13 +293,7 @@ export default {
           align: "center",
         },
         {
-          prop: "creatorId",
-          label: "汇总类型",
-          width: "80px",
-          align: "center",
-        },
-        {
-          prop: "createTime",
+          prop: "version",
           label: "状态",
           width: "50px",
           align: "center",
@@ -330,12 +305,13 @@ export default {
           align: "center",
         },
         {
-          prop: "group",
-          label: "所在分组",
+          prop: "groupname",
+          label: this.type === "group" ? "所在分组" : "所在目录",
           width: "80px",
           align: "center",
         },
       ],
+      reqTableParams: [],
       // 分组
       title: "",
       isShowDialog: false,
@@ -350,86 +326,43 @@ export default {
     uploadData() {
       return { fileId: this.nodeId };
     },
-    // 树点击查询
+    // 表格
     reqTableUrl() {
       if (!this.nodeId) {
         return "";
       }
-      return `/api/meta/v1/group/list.do`;
+      return `/api/meta/v1/groups/group/list.do`;
     },
-    reqTableParams() {
-      if (this.nodeId) {
-        return [
-          {
-            name: "group",
-            vtype: "json",
-            data: {
-              folderType: this.type === "group" ? "0" : "1", //目录还是分组 0
-              partitionCode: this.partition, //当前的分区code 1
-              nodeId: this.nodeId, //当前的结点id
-              groupTag: "", //动态查询条件名称或者编码
-              groupStatus: "", //动态查询条件分组的状态
-              groupType: "", //动态查询条件分组的类型
-            },
-          },
-        ];
-      } else {
-        return [];
-      }
-    },
-
-    // 表单查询
-    reqGroupItemTableUrl() {
-      if (!this.nodeId) {
-        return "";
-      }
-      return `/api/meta/v1/group/list.do`;
-    },
-    reqGroupItemTableParams() {
-      if (this.nodeId) {
-        return [
-          {
-            name: "group",
-            vtype: "json",
-            data: {
-              folderType: this.type === "group" ? "0" : "1", //目录还是分组 0
-              partitionCode: this.partition, //当前的分区code 1
-              nodeId: this.nodeId, //当前的结点id
-              groupTag: this.queryForm.label, //动态查询条件名称或者编码
-            },
-          },
-        ];
-      } else {
-        return [];
-      }
+  },
+  watch: {
+    type: {
+      handler(val) {
+        if (val === "group") {
+          this.typeCh = "分组";
+        } else if (val === "catalog") {
+          this.typeCh = "目录";
+        }
+      },
     },
   },
   created() {
     this.type = getUrl("type");
-    // this.getPartitionSelect();
-    // this.getGroupTree();
+    this.getGroupTree();
+  },
+  mounted() {
+    // postJSON("/api/core/v1/dictionary/queryData.do?dicId=MD_GROUP_TYPE").then(
+    //   (res) => {
+    //     this.$set(this.fuColumn[4], "changeArr", res.data[0].data);
+    //     this.$set(this.groupItemColumn[4], "changeArr", res.data[0].data);
+    //   }
+    // );
   },
   methods: {
-    /**
-     * @description 分区
-     */
-    // getPartitionSelect() {
-    //   getPartitionSelect()
-    //     .then((res) => {
-    //       this.partitionOptions = res.data[0].data;
-    //       console.log(this.partitionOptions);
-    //       this.partition = this.partitionOptions[0].value;
-    //       this.getGroupTree();
-    //     })
-    //     .catch((err) => {
-    //       console.log(err);
-    //     });
-    // },
     /**
      * @description 分组树
      */
     getGroupTree() {
-      getGroupTree(this.partition, this.type)
+      getGroupTree()
         .then((res) => {
           let data = res.data[0].data;
           this.treeData = this.transformTozTreeFormat(data);
@@ -469,9 +402,32 @@ export default {
       return node.children;
     },
     nodeClick(data) {
-      this.isShowSearchTable = false;
       this.nodeId = data.id;
       this.nodeType = data.statGroupFolderType;
+      this.fuColumn = this.groupColumn;
+      this.queryForm.label = "";
+      this.reqTableParams = [
+        {
+          name: "id",
+          vtype: "attr",
+          data: this.nodeId,
+        },
+        {
+          name: "nameCode",
+          vtype: "attr",
+          data: "",
+        },
+        {
+          name: "hasChildren",
+          vtype: "attr",
+          data: "no",
+        },
+        {
+          name: "statGroupType",
+          vtype: "attr",
+          data: this.type === "group" ? "1,3" : "2",
+        },
+      ];
     },
     /**
      * @description 关闭新建分组弹框
@@ -489,14 +445,56 @@ export default {
       this.title = "查看详情";
       this.isShowDialog = true;
       this.groupDisabled = true;
-      this.group = row;
+      let statGroupId = "";
+      if (row.statGroupId) {
+        statGroupId = row.statGroupId;
+      } else {
+        statGroupId = row.id;
+      }
+      postJSON("/api/meta/v1/groups/group/select.do", {
+        postData: JSON.stringify({
+          data: [
+            {
+              name: "statGroupId",
+              vtype: "attr",
+              data: statGroupId,
+            },
+          ],
+        }),
+      }).then((res) => {
+        this.group = res.data[0].data;
+        this.isShowDialog = true;
+      });
     },
     /**
      * @description 表单查询
      */
     tableSearch(form) {
-      this.isShowSearchTable = true;
+      console.log(form, "form");
+      this.fuColumn = this.groupItemColumn;
       this.queryForm = JSON.parse(JSON.stringify(form));
+      this.reqTableParams = [
+        {
+          name: "id",
+          vtype: "attr",
+          data: this.nodeId,
+        },
+        {
+          name: "nameCode",
+          vtype: "attr",
+          data: this.queryForm.label,
+        },
+        {
+          name: "hasChildren",
+          vtype: "attr",
+          data: "yes",
+        },
+        {
+          name: "statGroupType",
+          vtype: "attr",
+          data: this.type === "group" ? "1,3" : "2",
+        },
+      ];
     },
     /**
      * @description 重置查询表单
@@ -506,8 +504,14 @@ export default {
      * @description 管理分项
      */
     itemizedManage(row) {
-      this.groupId = row.statGroupId;
-      this.group = row;
+      console.log(row);
+      if (row.statGroupId) {
+        this.queryId = row.statGroupId;
+        this.queryType = row.statGroupType;
+      } else {
+        this.queryId = row.id;
+        this.queryType = row.type;
+      }
       this.isShowItemizedManage = true;
     },
     closeItemizedManage() {

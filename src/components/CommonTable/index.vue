@@ -256,35 +256,7 @@ export default {
         return {
           page: 1,
           pagerows: 10,
-          rows: [
-            {
-              statGroupNameCh: "分组",
-              statGroupCode: "分组",
-              statGroupAlias: "分组",
-              groupType: "1",
-              statGroupVersion: "分组",
-              creatorId: "分组",
-              createTime: "分组",
-            },
-            {
-              statGroupNameCh: "分组1",
-              statGroupCode: "分组1",
-              statGroupAlias: "分组1",
-              groupType: "3",
-              statGroupVersion: "分组1",
-              creatorId: "分组1",
-              createTime: "分组1",
-            },
-            {
-              statGroupNameCh: "分项",
-              statGroupCode: "分项",
-              statGroupAlias: "分项",
-              groupType: "4",
-              statGroupVersion: "分项",
-              creatorId: "分项",
-              createTime: "分项",
-            },
-          ],
+          rows: [],
           totalrows: 0,
         };
       },

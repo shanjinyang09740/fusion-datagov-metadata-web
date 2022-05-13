@@ -1,41 +1,57 @@
 <template>
   <div class="main">
     <div class="header">
-      <div>
-        <advanced-query
-          :columns="queryColumns"
-          :hideAdvancedQuery="true"
-          @search="tableSearch"
-        ></advanced-query>
-      </div>
+      <fu-form :inline="true" class="form">
+        <fu-form-item label="分项名称/编码">
+          <fu-input
+            size="medium"
+            v-model="queryForm.label"
+            placeholder="请输入"
+            clearable
+          ></fu-input>
+        </fu-form-item>
+        <fu-form-item>
+          <fu-button
+            size="medium"
+            type="primary"
+            clearable
+            @click="formTableSearch"
+            >查询</fu-button
+          >
+        </fu-form-item>
+      </fu-form>
     </div>
     <component-group-table
       ref="itemizeTable"
-      :tableData="tableData"
-      :tableType="'itemize'"
+      :postTableData="postTableData"
+      :isShowOperate="false"
+      :isShowCheckBox="false"
+      :tableCompType="tableCompType"
+      :rowKey="rowKey"
     ></component-group-table>
   </div>
 </template>
 <script>
-import { Message } from "fusion-ui";
-import AdvancedQuery from "@/components/AdvancedQuery";
-import ComponentGroupTable from "./ComponentGroupTable";
+import { Button, Input, Form, FormItem } from "fusion-ui";
+import ComponentGroupTable from "@/components/ComponentGroupTable";
 import {
-  getItemizeDetail,
   getItemizeTable,
-  saveAttribute,
+  queryItemizeDetail,
 } from "@/service/modules/labelManage.js";
 export default {
   components: {
-    AdvancedQuery,
+    FuButton: Button,
+    FuInput: Input,
+    FuForm: Form,
+    FuFormItem: FormItem,
     ComponentGroupTable,
   },
   props: {
-    groupId: {
+    queryId: {
       type: String,
       default: "",
     },
-    groupCode: {
+    queryType: {
       type: String,
       default: "",
     },
@@ -47,92 +63,53 @@ export default {
       // 分项id
       ItemizeId: "",
       // 查询表单
-      queryForm: {
-        groupNameCode: "",
-        statGroupType: "",
-      },
-      queryColumns: [
-        {
-          label: "分项名称/编码：",
-          modelData: "groupNameCode",
-          type: "input",
-          labelWidth: "150px",
-          defaultValue: "",
-          isSearchShow: true,
-        },
-      ],
-
-      tableData: {
-        column: [
-          {
-            label: "分项名称",
-            prop: "zbName",
-            width: "100px",
-          },
-          {
-            label: "层级",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "顺序号",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "分项编码",
-            prop: "code",
-            width: "100px",
-          },
-          {
-            label: "别名",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "计量单位量纲",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "计量单位",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "类型",
-            prop: "",
-            width: "100px",
-          },
-          {
-            label: "说明",
-            prop: "",
-            width: "100px",
-          },
-        ],
-        page: 1,
-        pagerows: 0,
+      queryForm: {},
+      /**分项表格相关数据 begin********************/
+      //表格行key
+      rowKey: "statGroupItemId",
+      //表格组件类别
+      tableCompType: "itemize",
+      //表格数据
+      postTableData: {
+        column: [],
         rows: [],
-        totalrows: 0,
       },
+      /**分项表格相关数据 begin********************/
       createFormItems: [],
-      isShowDialog: false,
       title: "",
+      selectionId: [],
       // 属性管理
       attrDialogVisible: false,
     };
   },
   created() {
-    this.getTableInfo();
+    if (this.queryType === "分项") {
+      this.queryItemizeDetail();
+    } else {
+      this.getTableInfo();
+    }
+  },
+  watch: {
+    queryForm: {
+      handler(newVal, oldVal) {
+        if (!newVal.label) {
+          this.formTableSearch();
+        }
+      },
+      deep: true,
+    },
   },
   methods: {
-    getTableInfo() {
-      getItemizeTable(this.groupId).then((res) => {
+    /**
+     * @description 查询分项详情
+     */
+    queryItemizeDetail() {
+      queryItemizeDetail(this.queryId).then((res) => {
         let result = res.data[0].data;
         if (result) {
-          this.$set(this.tableData, "rows", result.tableData);
+          this.$set(this.postTableData, "rows", result.tableData);
           this.ids = result.tableData.map((i) => {
-            return i.statItemId;
+            return i.statGroupItemId;
           });
           let data = result.tableHead;
           let column = [];
@@ -140,71 +117,46 @@ export default {
             column.push({
               label: data[key],
               prop: key,
+              isInput: false,
+              isIndent: key === "StatGroupItemName" ? true : false,
             });
           }
-          this.$set(this.tableData, "column", column);
+          this.$set(this.postTableData, "column", column);
         }
       });
     },
     /**
-     * @description 获取分项信息
+     * @description 表单查询表格
+     * @param {}
+     * @returns {}
      */
-    getItemizeDetail(id) {
-      getItemizeDetail(id).then((res) => {
-        let data = res.data[0].data;
-        if (data) {
-          this.createFormItems = data;
-          this.isShowDialog = true;
-        }
-      });
+    formTableSearch() {
+      this.$refs.itemizeTable.tableBlurredQuery(
+        ["statGroupItemName", "statGroupItemCode"],
+        this.queryForm.label
+      );
     },
-    /**
-     * @description 表单查询
-     */
-    tableSearch(form) {
-      this.queryForm = JSON.parse(JSON.stringify(form));
-    },
-    /**
-     * @description 管理分项属性
-     */
-    manageAttr() {
-      this.attrDialogVisible = true;
-    },
-    addAttr() {
-      this.$refs.attrDialog.add();
-    },
-    submitAttr() {
-      console.log(this.groupId, "属性列表");
-      let params = {
-        statGroupId: this.groupId,
-        statGroupCode: this.groupCode,
-        tableData: this.$refs.attrDialog.tableData.rows,
-      };
-      saveAttribute(params)
-        .then((res) => {
-          let result = res.data[0].data;
-          if (result) {
-            this.$set(this.tableData, "rows", result.tableData);
-            let data = result.tableHead;
-            let column = [];
-            for (const key in data) {
-              column.push({
-                label: data[key],
-                prop: key,
-              });
-            }
-            this.$set(this.tableData, "column", column);
-            console.log(this.tableData);
-            Message.success("保存成功!");
-            this.attrDialogVisible = false;
+    getTableInfo() {
+      getItemizeTable(this.queryId).then((res) => {
+        let result = res.data[0].data;
+        if (result) {
+          this.$set(this.postTableData, "rows", result.tableData);
+          this.ids = result.tableData.map((i) => {
+            return i.statGroupItemId;
+          });
+          let data = result.tableHead;
+          let column = [];
+          for (const key in data) {
+            column.push({
+              label: data[key],
+              prop: key,
+              isInput: false,
+              isIndent: key === "StatGroupItemName" ? true : false,
+            });
           }
-        })
-        .catch((err) => {
-          Message.error(`保存失败!，${err.errorMessage}`);
-        });
-    },
-    closeAttrDialog() {
-      this.attrDialogVisible = false;
+          this.$set(this.postTableData, "column", column);
+        }
+      });
     },
   },
 };
@@ -219,5 +171,8 @@ export default {
   box-sizing: border-box;
   display: flex;
   justify-content: flex-end;
+}
+.attrSubmit {
+  margin: 0 10px 10px;
 }
 </style>
